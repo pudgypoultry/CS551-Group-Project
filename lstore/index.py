@@ -7,7 +7,6 @@ class Index:
     def __init__(self, table):
         # One index for each table. All our empty initially.
         self.indices = [None] *  table.num_columns
-        pass
 
     """
     # returns the location of all records with the given value on column "column"
