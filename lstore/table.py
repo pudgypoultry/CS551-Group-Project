@@ -31,13 +31,22 @@ class Table:
         self.next_rid = 1
 
         self.BLOCK_SIZE = 16
+        self.RID_SIZE = 2
 
     def __merge(self):
         print("merge is happening")
         pass
 
     def __convert_to_bytes(self, entry):
-        pass
+        if isinstance(entry, int):
+            # FIXME: byteorder is currently set to big, could change to little
+            entry_as_bytes = bytearray(entry.to_bytes(self.BLOCK_SIZE - self.RID_SIZE, byteorder="big"))
+        elif isinstance(entry, str):
+            entry_as_bytes = bytearray(entry.encode("utf-8")).extend(self.BLOCK_SIZE - self.RID_SIZE - len(entry))
+        else:
+            # FIXME: implement for other types, like float
+            raise TypeError("entry must be a str or int")
+        return entry_as_bytes
 
     def add_record(self, record: Record):
         # increase rid counter so each new record as a unique rid
