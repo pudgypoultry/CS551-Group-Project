@@ -32,3 +32,11 @@ class Table:
         print("merge is happening")
         pass
 
+    def __convert_to_bytes(self, entry):
+        pass
+
+    def add_record(self, record:Record):
+        pass
+
+    def make_new_page(self, column_index:int):
+        pass
