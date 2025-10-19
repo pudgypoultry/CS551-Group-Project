@@ -30,7 +30,16 @@ class Query:
     """
     def insert(self, *columns):
         schema_encoding = '0' * self.table.num_columns
-        pass
+
+        rid = self.table.next_rid
+        key = self.table.key
+        new_record = Record(rid, key, columns)
+
+        self.table.add_record(new_record)
+
+        # FIXME: Should raise exception when things go wrong
+        return True
+
 
     
     """
