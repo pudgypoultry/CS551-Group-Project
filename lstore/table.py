@@ -27,6 +27,7 @@ class Table:
         self.num_columns = num_columns
         self.page_directory = {}
         self.index = Index(self)
+        self.next_rid = 1
 
     def __merge(self):
         print("merge is happening")
@@ -35,8 +36,24 @@ class Table:
     def __convert_to_bytes(self, entry):
         pass
 
-    def add_record(self, record:Record):
-        pass
+    def add_record(self, record: Record):
+        # increase rid counter so each new record as a unique rid
+        self.next_rid += 1
+
+        # FIXME: Raise exception when record is incorrect length, etc.
+        # for each column in the record
+        for i in range(len(record.columns)):
+            # convert to a bytearray object
+            record_in_bytes: bytearray = self.__convert_to_bytes(record.columns[i])
+            # make sure there is page space
+            if self.page_directory[i][-1].is_full():
+                self.make_new_page(i)
+            # write entry to page
+            self.page_directory[i][-1].write(record_in_bytes)
+        
+        # FIXME: return something different?
+        return None
+
 
     def make_new_page(self, column_index:int):
         pass
