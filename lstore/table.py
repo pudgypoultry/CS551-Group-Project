@@ -56,10 +56,14 @@ class Table:
         # for each column in the record
         for i in range(len(record.columns)):
             # convert to a bytearray object
-            record_in_bytes: bytearray = self.__convert_to_bytes(record.columns[i])
+            rid_in_bytes = bytearray( record.rid.to_bytes(self.RID_SIZE, byteorder="big") )
+            entry_in_bytes = bytearray( self.__convert_to_bytes(record.columns[i]) )
+            record_in_bytes: bytearray = rid_in_bytes.extend(entry_in_bytes)
+
             # make sure there is page space
             if self.page_directory[i][-1].is_full():
                 self.make_new_page(i)
+            
             # write entry to page
             self.page_directory[i][-1].write(record_in_bytes)
         
