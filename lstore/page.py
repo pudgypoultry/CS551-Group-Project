@@ -9,6 +9,9 @@ class Page:
     def has_capacity(self):
         pass
 
+    def is_full(self):
+        return ((self.num_records + 1) * self.block_size) >= 4096
+
     def write(self, value: bytearray):
         """
         Takes a bytearray and writes into the next available block of bytes.
