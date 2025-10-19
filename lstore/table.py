@@ -1,4 +1,5 @@
 from lstore.index import Index
+from lstore.page import Page
 from time import time
 
 INDIRECTION_COLUMN = 0
@@ -29,6 +30,8 @@ class Table:
         self.index = Index(self)
         self.next_rid = 1
 
+        self.BLOCK_SIZE = 16
+
     def __merge(self):
         print("merge is happening")
         pass
@@ -56,4 +59,16 @@ class Table:
 
 
     def make_new_page(self, column_index:int):
-        pass
+
+        # during initiation, each column index is associated with an empty list
+        if column_index not in self.page_directory.keys():
+            self.page_directory[column_index] = []
+
+        # add pages for each column as needed
+        # FIXME: For now every page has a fixed block size, later we might want to 
+        new_page = Page(self.BLOCK_SIZE)
+
+        self.page_directory[column_index].append(new_page)
+
+        # FIXME: Possibly change what it returns
+        return True
