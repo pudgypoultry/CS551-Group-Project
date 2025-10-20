@@ -53,6 +53,10 @@ class Table:
         return entry_as_bytes
 
     def add_record(self, record: Record):
+        # If the record has too many or not enough columns, an error is raised
+        if (len(record.columns) != self.num_columns):
+            raise ValueError("Number of columns in Record object does not match number of columns in Table.")
+        
         # increase rid counter so each new record as a unique rid
         self.next_rid += 1
 
@@ -72,8 +76,7 @@ class Table:
             # write entry to page
             self.page_directory[i][-1].write(record_in_bytes)
         
-        # FIXME: return something different?
-        return None
+        return True
 
 
     def make_new_page(self, column_index:int):

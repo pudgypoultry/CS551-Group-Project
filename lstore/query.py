@@ -31,14 +31,20 @@ class Query:
     def insert(self, *columns):
         schema_encoding = '0' * self.table.num_columns
 
+        # get the next unused rid
         rid = self.table.next_rid
+        # key column index
         key = self.table.key
-        new_record = Record(rid, key, columns)
 
-        self.table.add_record(new_record)
-
-        # FIXME: Should raise exception when things go wrong
-        return True
+        try: 
+            new_record = Record(rid, key, columns)
+            self.table.add_record(new_record)
+        except Exception:
+            # returns False if insert fails
+            return False
+        else:
+            # returns True if add_record works without error
+            return True
 
 
     
