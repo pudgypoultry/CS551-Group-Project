@@ -60,7 +60,6 @@ class Table:
         # increase rid counter so each new record as a unique rid
         self.next_rid += 1
 
-        # FIXME: Raise exception when record is incorrect length, etc.
         # for each column in the record
         for i in range(len(record.columns)):
             # convert to a bytearray object
@@ -80,13 +79,13 @@ class Table:
 
 
     def make_new_page(self, column_index:int):
-
+        # FIXME: Possibly change the organization of page_directory
         # during initiation, each column index is associated with an empty list
         if column_index not in self.page_directory.keys():
             self.page_directory[column_index] = []
 
         # add pages for each column as needed
-        # FIXME: For now every page has a fixed block size, later we might want to 
+        # FIXME: For now every page has a fixed block size, later we might want to vary the block size per table
         new_page = Page(self.BLOCK_SIZE)
 
         self.page_directory[column_index].append(new_page)
