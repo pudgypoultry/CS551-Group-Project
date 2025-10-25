@@ -58,9 +58,71 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select(self, search_key, search_key_index, projected_columns_index):
-        pass
+        #FIXME: actually define what lockedByTPL means here
+        #FIXME: this is slow as hell lol
+        #FIXME: I have done too much here, offload work to page and index
+        lockedByTPL = False
+        if lockedByTPL:
+            return False
 
-    
+        # Gonna need a list to hold matches in and a list of record objects to return
+        matchingRids = []
+        returnList = []
+
+        # Grab the list of pages from the page_directory with the search_key_index
+        searchColumnPages = self.table.page_directory[search_key_index]
+
+        # Find matching RIDs
+        for page in searchColumnPages:
+            # Go through each page, go through each record in each page, reconstruct ints from bytes stored in those pages in the correct positions
+            for i in range(page.num_records):
+                # Starting byte is at the start of the block size for the current record number
+                startByte = i * self.table.BLOCK_SIZE
+                # Need to get the rid bytes, use the offset given in the table for RID_SIZE
+                ridBytes = page.data[startByte : startByte + self.table.RID_SIZE]
+                # Need to get the bytes of the data, those live after the RID and to the end of the block size
+                dataBytes = page.data[startByte + self.table.RID_SIZE : startByte + self.table.BLOCK_SIZE]
+                # Reconstruct the int that the datebytes represent
+                value = int.from_bytes(dataBytes, byteorder="big")
+                # If that value is the search_key that we're looking for, add it to the list of matching RIDs
+                if value == search_key:
+                    rid = int.from_bytes(ridBytes, byteorder="big")
+                    matchingRids.append(rid)
+
+        # If no matches, return false
+        if len(matchingRids) == 0:
+            return False
+
+        # Now grab each column that we're looking for via the input of projected_columns_index
+        for rid in matchingRids:
+            recordColumns = [None]*self.table.num_columns
+            for colIndex in range(self.table.num_columns):
+                if projected_columns_index[colIndex] == 1:
+                    valueFound = False
+                    columnPages = self.table.page_directory[colIndex]
+                    for page in columnPages:
+                        for i in range(page.num_records):
+                            startByte = i * self.table.BLOCK_SIZE
+                            ridBytes = page.data[startByte : startByte + self.table.RID_SIZE]
+                            currentRid = int.from_bytes(ridBytes, byteorder="big")
+
+                            if currentRid == rid:
+                                dataBytes = page.data[startByte + self.table.RID_SIZE : startByte + self.table.BLOCK_SIZE]
+                                value = int.from_bytes(dataBytes, byteorder="big")
+                                recordColumns[colIndex] = value
+                                valueFound = True
+                                break
+
+                        if valueFound:
+                            break
+
+            primaryKeyValue = recordColumns[self.table.key]
+            finalRecord = Record(rid, primaryKeyValue, recordColumns)
+            returnList.append(finalRecord)
+            # print("Returning: ", returnList)
+            return returnList
+
+
     """
     # Read matching record with specified search key
     # :param search_key: the value you want to search based on
