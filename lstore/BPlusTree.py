@@ -1,11 +1,10 @@
 """
-Documentation for the bplustree class.
+Documentation for the BPlusTree class.
 Author: Andrew Teske ateske@uoregon.edu
 Description:
     This file contains an implementation of a B+ Tree meant to store pages efficiently
     This page by benben233 helped a ton in understanding the implementation:
         https://gist.github.com/benben233/2c8a2a8ab44a7beabad0df1b6658232e
-
 """
 
 import random
@@ -87,8 +86,9 @@ class Node(object):
     def split(self):
         """
         Splits the node into two and stores them as child nodes.
-        extract a pivot from the child to be inserted into the keys of the parent.
-        Returns the new key for this node as well as a list containing the two resulting nodes (this Node on the right)
+        Extract a pivot from the child to be inserted into the keys of the parent.
+        Return:
+            new key for this node as well as a list containing the two resulting nodes (this Node on the right)
         """
         # For debugging
         global splits, parent_splits
@@ -172,9 +172,11 @@ class Leaf(Node):
 
     """
     Attributes:
-        parent: the parent node
-        prev_node: the leaf node to the left of this leaf
-        next_node: the leaf node to the right of this leaf
+        self.keys : list of keys
+        self.values : list of nodes
+        self.parent : the Node that acts as the parent to this node
+        self.prev_node: the leaf node to the left of this leaf
+        self.next_node: the leaf node to the right of this leaf
     """
     def __init__(self, parent=None, prev_node=None, next_node=None):
         """
@@ -355,6 +357,9 @@ class BPlusTree(object):
         """
         For a parent and child node,
             Insert the values from the child into the values of the parent.
+        Inputs:
+            key : the key to insert at
+            values : the list of nodes to associate with key
         """
         parent = values[1].parent
         if parent is None:
