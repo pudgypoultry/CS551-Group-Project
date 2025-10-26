@@ -3,6 +3,22 @@ import os
 import logging
 
 #from lstore.setupLogging import *
+"""
+Documentation for the page class.
+Author: Jared Hall jhall10@uoregon.edu
+Description:
+    This file contains our implementation of the core storage data structure for our L-Store database.
+    The page class contains all of the necessary operations for the page. See the method documentation
+    for a detailed breakdown of all methods.
+Modifications:
+    ~ M2 ~
+    1. I changed the page class to add efficient bufferpool maniputation to the page.
+       The page class should be able to handle all operations regarding the page.
+       i. I added a UID to the page for page-based indexing.
+       ii. I added methods to read from and write to a file as well as a method for pages to 
+           automatically do so.
+       iii. All data stored in the page has a fixed chunck size of 8 bytes
+"""
 
 class Page:
 
