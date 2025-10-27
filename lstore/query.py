@@ -81,11 +81,20 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
+        # the most recently added record with matching primary_key is retrieved from database and stored as record
         try:
-            self.select(primary_key, self.table.key, [1]*self.table.num_columns)
+            record = self.select(primary_key, self.table.key, [1]*self.table.num_columns)[0]
         except:
             # Select failed so return false
             return False
+        # FIXME: This is mostly just pseudocode and comments for the time being
+        new_columns = record.columns.copy()
+        updated_rid = self.table.next_rid
+        new_columns[record.key] = updated_rid
+        updated_record = Record(updated_rid, record.key, new_columns)
+        # a new record object is created to match the original record except the updated columns are updated
+        # the updated record is added onto the table, pointer pointing towards most recent record
+        
         
 
     
@@ -110,7 +119,7 @@ class Query:
         for t in range(start_range, end_range + 1):
             # only accesses the needed column
             try:
-                sum += self.select(t, self.table.key, columns_to_get).columns[0] #FIXME: This might raise errors depending on how Record is implemented
+                sum += self.select(t, self.table.key, columns_to_get)[0].columns[0] #FIXME: This might raise errors depending on how Record is implemented
                 record_exists = True
             except:
                 continue
