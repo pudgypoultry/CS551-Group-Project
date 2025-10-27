@@ -81,7 +81,12 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        pass
+        try:
+            self.select(primary_key, self.table.key, [1]*self.table.num_columns)
+        except:
+            # Select failed so return false
+            return False
+        
 
     
     """
@@ -93,8 +98,27 @@ class Query:
     # Returns False if no record exists in the given range
     """
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+        columns_to_get = []
+        for i in range(aggregate_column_index-1):
+            columns_to_get.append(0)
+        columns_to_get.append(1)
+        for i in range(self.table.num_columns - aggregate_column_index):
+            columns_to_get.append(0)
+        sum = 0
+        record_exists = False
 
+        for t in range(start_range, end_range + 1):
+            # only accesses the needed column
+            try:
+                sum += self.select(t, self.table.key, columns_to_get).columns[0] #FIXME: This might raise errors depending on how Record is implemented
+                record_exists = True
+            except:
+                continue
+
+        if record_exists:
+            return sum
+        else:
+            return False
     
     """
     :param start_range: int         # Start of the key range to aggregate 
