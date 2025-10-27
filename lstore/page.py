@@ -67,6 +67,7 @@ class Page:
         self.startTime = time.time()
         self.cycle = 30
 
+        self.num_records = 0
         self.capacity = 0
         self.entrySize = size
         self.path = path
@@ -219,6 +220,7 @@ class Page:
             f"Data in array after writing: index-1: {self.data[(index - 8): ((index - 8) + 8)]} - index: {self.data[(index): ((index) + 8)]} - index+1: {self.data[(index + 8): ((index + 8) + 8)]}")
         self.setDirty()
         self.log.debug(f"Complete! Returning index: {index}")
+        self.num_records += 1
         return index
 
     def read(self, index):
@@ -253,6 +255,7 @@ class Page:
         self.availableOffsets.append(index)
         self.log.debug(f"Last 5 offsets after remove: {self.availableOffsets[-5:]}")
         self.setDirty()
+        self.num_records -= 1
 
     def calculateLFU(self):
         """

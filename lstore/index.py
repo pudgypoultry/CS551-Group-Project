@@ -28,18 +28,24 @@ class Index:
         # One index for each table. All are empty initially.
         self.indices = [None] * table.num_columns
         self.btree_order = btree_order
-        pass
+        for i in range(table.num_columns):
+            current_tree = BPlusTree(btree_order)
+            self.indices[i] = current_tree
+            table.make_new_page(i)
+
 
     """
     # returns the location of all records with the given value on column "column"
     """
 
     def locate(self, column, value):
-        rid_list = []
         # search through b+ tree to get to the correct column
-        # for each record in column
-        # check to see if it matches value, if so, append rid to rid_list
-        return rid_list
+        if self.indices[column] is not None:
+            currentTree = self.indices[column]
+            # self.indices is full of B+ trees for each column
+            return currentTree.query(value)
+        else:
+            return []
 
     """
     # Returns the RIDs of all records with values in column "column" between "begin" and "end"
@@ -65,3 +71,7 @@ class Index:
 
     def drop_index(self, column_number):
         pass
+
+
+if __name__ == "__main__":
+    pass

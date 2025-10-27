@@ -59,6 +59,13 @@ class Query:
     """
     def select(self, search_key, search_key_index, projected_columns_index):
         #FIXME: actually define what lockedByTPL means here
+        lockedByTPL = False
+        if lockedByTPL:
+            return False
+
+
+    """
+
         #FIXME: this is slow as hell lol
         #FIXME: I have done too much here, offload work to page and index
         lockedByTPL = False
@@ -121,7 +128,7 @@ class Query:
             returnList.append(finalRecord)
             # print("Returning: ", returnList)
             return returnList
-
+    """
 
     """
     # Read matching record with specified search key

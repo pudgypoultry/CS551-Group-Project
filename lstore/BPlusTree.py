@@ -175,8 +175,8 @@ class Leaf(Node):
         self.keys : list of keys
         self.values : list of nodes
         self.parent : the Node that acts as the parent to this node
-        self.prev_node: the leaf node to the left of this leaf
-        self.next_node: the leaf node to the right of this leaf
+        self.prev: the leaf node to the left of this leaf
+        self.next: the leaf node to the right of this leaf
     """
     def __init__(self, parent=None, prev_node=None, next_node=None):
         """
