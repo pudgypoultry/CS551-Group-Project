@@ -76,8 +76,7 @@ class Table:
             self.page_directory[i][-1].write(record_in_bytes)
         
         return True
-
-
+    
     def make_new_page(self, column_index:int):
         # FIXME: Possibly change the organization of page_directory
         # during initiation, each column index is associated with an empty list
@@ -85,10 +84,29 @@ class Table:
             self.page_directory[column_index] = []
 
         # add pages for each column as needed
-        # FIXME: For now every page has a fixed block size, later we might want to vary the block size per table
-        new_page = Page(self.BLOCK_SIZE)
-
+        new_pid = "P-"+str(self.current_page)
+        new_path = "./TestData/"+self.name+"_"+new_pid
+        new_page = Page(new_pid, new_path, capacity=4096, size=self.BLOCK_SIZE)
+        self.current_page += 1
         self.page_directory[column_index].append(new_page)
 
         # FIXME: Possibly change what it returns
         return True
+
+
+ 
+
+    # def make_new_page(self, column_index:int):
+    #     # FIXME: Possibly change the organization of page_directory
+    #     # during initiation, each column index is associated with an empty list
+    #     if column_index not in self.page_directory.keys():
+    #         self.page_directory[column_index] = []
+
+    #     # add pages for each column as needed
+    #     # FIXME: For now every page has a fixed block size, later we might want to vary the block size per table
+    #     new_page = Page(self.BLOCK_SIZE)
+
+    #     self.page_directory[column_index].append(new_page)
+
+    #     # FIXME: Possibly change what it returns
+    #     return True
