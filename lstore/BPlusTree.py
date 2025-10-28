@@ -20,7 +20,7 @@ class Node(object):
     """
     Base node object. It should be index node
     Each node stores keys and points to nodes
-    Leaf nodes will inherit from this and themselves store references to pages
+    Leaf nodes will inherit from this and themselves store references to RIDs
     Init Inputs:
         parent : Node, default None
     """
@@ -173,7 +173,7 @@ class Leaf(Node):
     """
     Attributes:
         self.keys : list of keys
-        self.values : list of nodes
+        self.values : list of values associated with keys
         self.parent : the Node that acts as the parent to this node
         self.prev: the leaf node to the left of this leaf
         self.next: the leaf node to the right of this leaf
@@ -353,6 +353,7 @@ class BPlusTree(object):
             self.__setitem__(key, value, leaf)
             return True, leaf
 
+
     def insert_index(self, key, values: list[Node]):
         """
         For a parent and child node,
@@ -373,7 +374,7 @@ class BPlusTree(object):
         # If the node is full, split the  node into two.
         if len(parent.keys) > self.maximum:
             self.insert_index(*parent.split())
-        # Once a leaf node is split, it consists of a internal node and two leaf nodes.
+        # Once a leaf node is split, it consists of an internal node and two leaf nodes.
         # These need to be re-inserted back into the tree.
 
     def delete(self, key, node: Node = None):

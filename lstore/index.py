@@ -29,9 +29,7 @@ class Index:
         self.indices = [None] * table.num_columns
         self.btree_order = btree_order
         for i in range(table.num_columns):
-            current_tree = BPlusTree(btree_order)
-            self.indices[i] = current_tree
-            table.make_new_page(i)
+            self.create_index(i)
 
 
     """
@@ -39,11 +37,12 @@ class Index:
     """
 
     def locate(self, column, value):
-        # search through b+ tree to get to the correct column
+        # search through b+ tree associated with the column
         if self.indices[column] is not None:
             currentTree = self.indices[column]
             # self.indices is full of B+ trees for each column
-            return currentTree.query(value)
+            return currentTree.query(value) # This is the leaf node where that value must live
+
         else:
             return []
 
@@ -54,8 +53,17 @@ class Index:
     def locate_range(self, begin, end, column):
         rid_list = []
         # search through b+ tree for the correct column
-        # for each record in the column between begin and end
-        # append rid of that record to rid_list
+        if self.indices[column] is not None:
+            currentTree = self.indices[column]
+            # for each record in the column between begin and end
+            for i in range(end - begin):
+                currentValue = currentTree.query(begin+i)
+                if currentValue is not None:
+                    for rid in currentValue:
+                        # append rid of that record to rid_list
+                        rid_list.append(rid)
+
+
         return rid_list
 
     """
@@ -65,12 +73,18 @@ class Index:
     def create_index(self, column_number):
         self.indices[column_number] = BPlusTree(self.btree_order)
 
+
+    def add_to_index(self, column_number, value, rid):
+        # use BPlusTree's __getitem__ to append the new rid to the respective value
+        if rid not in self.indices[column_number][value].append(rid):
+            self.indices[column_number] = self.indices[column_number][value].append(rid)
+
     """
     # optional: Drop index of specific column
     """
 
     def drop_index(self, column_number):
-        pass
+        self.indices[column_number] = None
 
 
 if __name__ == "__main__":
