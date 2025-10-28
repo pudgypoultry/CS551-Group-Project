@@ -74,14 +74,14 @@ class Table:
             record_in_bytes.extend(entry_in_bytes)
 
             # make sure there is page space
-            if self.page_directory[i][-1].is_full():
+            if self.page_directory[i][-1].is_full(): # FIXME: change to appropriate function name
                 self.make_new_page(i)
             
             # write entry to page
             self.page_directory[i][-1].write(record_in_bytes)
 
         self.page_directory[-1][-1].write(pointer) #FIXME: how to store a None object?
-        
+        self.page_directory[-2][-1].write(record.rid)
         return True
     
     # def update(self, updated_record):
@@ -119,6 +119,14 @@ class Table:
                         continue
             else:
                 return_columns.append(None)
+
+        # get rid
+        for page in self.page_directory[-2]:
+            # FIXME: I believe this works with how read is implemented, but am unsure
+            try:
+                rid = page.read(index)
+            except:
+                continue
         record = Record(rid, self.key, return_columns)
 
         return record
