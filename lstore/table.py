@@ -104,16 +104,19 @@ class Table:
     #     # FIXME: Possibly change what it returns
     #     return True
 
-    def get_record(self, rid, columns):
-        index = self.index.locate(rid)
+    def get_record(self, index, columns):
+        # index = self.index.locate(rid)
 
         return_columns = []
         for i in range(len(columns)):
             if columns[i] == 1:
                 for page in self.page_directory[i]:
-                    # FIXME: I believe this is how read is implemented, but am unsure
-                    cell = page.read(index)
-                    return_columns.append(cell)
+                    # FIXME: I believe this works with how read is implemented, but am unsure
+                    try:
+                        cell = page.read(index)
+                        return_columns.append(cell)
+                    except:
+                        continue
             else:
                 return_columns.append(None)
         record = Record(rid, self.key, return_columns)
