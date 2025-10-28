@@ -30,8 +30,16 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
-        schema_encoding = '0' * self.table.num_columns
-        pass
+        # schema_encoding = '0' * self.table.num_columns
+        try: 
+            self.table.insert(columns)
+        except Exception:
+            # returns False if insert fails
+            return False
+        else:
+            # returns True if Table.insert() works without error
+            return True
+
 
     
     """
@@ -67,7 +75,14 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        pass
+        # same as insert, uses table.update
+        try:
+            self.table.update(primary_key, columns)
+        except Exception:
+            return False
+        else:
+            return True
+
 
     
     """
