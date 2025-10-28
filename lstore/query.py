@@ -127,7 +127,28 @@ class Query:
     # Returns False if no record exists in the given range
     """
     def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
-        pass
+        # Set up
+        column_to_get = [0]*self.table.num_columns
+        column_to_get[aggregate_column_index] = 1
+        sum = 0
+        record_exists = False
+
+        for t in range(start_range, end_range + 1):
+            # only accesses the needed column
+            try:
+                # select only the needed column using primary key
+                # self.select(t, self.table.key, column_to_get) should return a list containing one record object
+                # this function is the same as sum, except for the following line using select_version instead of select
+                sum += self.select_version(t, self.table.key, column_to_get, relative_version)[0].columns[0]
+                record_exists = True
+            except:
+                continue
+
+        if record_exists:
+            return sum
+        else:
+            # If there are no entries within the range return False
+            return False
 
     
     """
