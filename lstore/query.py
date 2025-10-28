@@ -58,6 +58,8 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select(self, search_key, search_key_index, projected_columns_index):
+        # index = self.table.index.locate(search_key_index, search_key)
+        # self.table.get_record()
         pass
 
     
@@ -87,13 +89,15 @@ class Query:
         except:
             # Select failed so return false
             return False
-        # FIXME: This is mostly just pseudocode and comments for the time being
-        new_columns = record.columns.copy()
-        updated_rid = self.table.next_rid
-        new_columns[record.key] = updated_rid
-        updated_record = Record(updated_rid, record.key, new_columns)
-        # a new record object is created to match the original record except the updated columns are updated
-        # the updated record is added onto the table, pointer pointing towards most recent record
+        # create new Record object
+        updated_record = Record(record.rid, record.key, columns)
+        # retrieve index of previous record
+        old_index = self.table.index.locate(record.key, record.column(record.key))
+        # add the record
+        self.table.add_record(updated_record, old_index)
+
+        # return True since successful
+        return True
         
         
 
