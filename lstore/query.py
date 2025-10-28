@@ -58,9 +58,27 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select(self, search_key, search_key_index, projected_columns_index):
-        # index = self.table.index.locate(search_key_index, search_key)
-        # self.table.get_record()
-        pass
+        indices = self.table.index.locate(search_key_index, search_key)
+        records = []
+        for i in indices:
+            records.append(self.table.get_record(i))
+
+        records_dict = {}
+
+        # Sort out the returned indices
+        for record in records:
+            if record.rid not in records_dict.keys():
+                records_dict[record.rid] = [record]
+            else:
+                records_dict[record.rid].append(record)
+        
+        return_list = []
+
+        for k in records_dict.keys():
+            records_dict[k].sort()
+            return_list.append(records_dict[k][-1])
+
+        return return_list
 
     
     """
@@ -92,7 +110,7 @@ class Query:
         # create new Record object
         updated_record = Record(record.rid, record.key, columns)
         # retrieve index of previous record
-        old_index = self.table.index.locate(record.key, record.column(record.key))
+        old_index = self.table.index.locate(record.key, record.column(record.key)).copy().sort()[-1]
         # add the record
         self.table.add_record(updated_record, old_index)
 
