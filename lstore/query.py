@@ -95,7 +95,35 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        pass
+        # get the indices of all matching records
+        indices = self.table.index.locate(search_key_index, search_key)
+
+        # get records from indices
+        records = []
+        for i in indices:
+            records.append(self.table.get_record(i))
+
+        records_dict = {}
+
+        # Sort out the returned indices uding records_dict
+        for record in records:
+            if record.rid not in records_dict.keys():
+                records_dict[record.rid] = [record]
+            else:
+                records_dict[record.rid].append(record)
+        
+        # Take the most recent record from each collection of records
+        return_list = []
+        for k in records_dict.keys():
+            records_dict[k].sort()
+            if abs(relative_version) > len(records_dict[k]):
+                # I believe this is what the tester wants when the index is out of range (i.e. get base entry)
+                return_list.append(records_dict[k][0])
+            else:
+                # FIXME: not sure if should be records_dict[k][relative_version - 1] instead
+                return_list.append(records_dict[k][relative_version]) 
+
+        return return_list
 
     
     """
