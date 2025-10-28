@@ -9,25 +9,26 @@ class Query:
     Queries that succeed should return the result or True
     Any query that crashes (due to exceptions) should return False
     """
+
     def __init__(self, table):
         self.table = table
 
-    
     """
     # internal Method
     # Read a record with specified RID
     # Returns True upon succesful deletion
     # Return False if record doesn't exist or is locked due to 2PL
     """
+
     def delete(self, primary_key):
         pass
-    
-    
+
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
     # Returns False if insert fails for whatever reason
     """
+
     def insert(self, *columns):
         schema_encoding = '0' * self.table.num_columns
 
@@ -36,7 +37,7 @@ class Query:
         # key column index
         key = self.table.key
 
-        try: 
+        try:
             new_record = Record(rid, key, columns)
             self.table.add_record(new_record)
         except Exception:
@@ -46,8 +47,6 @@ class Query:
             # returns True if add_record works without error
             return True
 
-
-    
     """
     # Read matching record with specified search key
     # :param search_key: the value you want to search based on
@@ -57,78 +56,32 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
+
     def select(self, search_key, search_key_index, projected_columns_index):
-        #FIXME: actually define what lockedByTPL means here
-        lockedByTPL = False
-        if lockedByTPL:
-            return False
+        # get the indices of all matching records
+        indices = self.table.index.locate(search_key_index, search_key)
 
+        # get records from indices
+        records = []
+        for i in indices:
+            records.append(self.table.get_record(i))
 
-    """
+        records_dict = {}
 
-        #FIXME: this is slow as hell lol
-        #FIXME: I have done too much here, offload work to page and index
-        lockedByTPL = False
-        if lockedByTPL:
-            return False
+        # Sort out the returned indices uding records_dict
+        for record in records:
+            if record.rid not in records_dict.keys():
+                records_dict[record.rid] = [record]
+            else:
+                records_dict[record.rid].append(record)
 
-        # Gonna need a list to hold matches in and a list of record objects to return
-        matchingRids = []
-        returnList = []
+        # Take the most recent record from each collection of records
+        return_list = []
+        for k in records_dict.keys():
+            records_dict[k].sort()
+            return_list.append(records_dict[k][-1])
 
-        # Grab the list of pages from the page_directory with the search_key_index
-        searchColumnPages = self.table.page_directory[search_key_index]
-
-        # Find matching RIDs
-        for page in searchColumnPages:
-            # Go through each page, go through each record in each page, reconstruct ints from bytes stored in those pages in the correct positions
-            for i in range(page.num_records):
-                # Starting byte is at the start of the block size for the current record number
-                startByte = i * self.table.BLOCK_SIZE
-                # Need to get the rid bytes, use the offset given in the table for RID_SIZE
-                ridBytes = page.data[startByte : startByte + self.table.RID_SIZE]
-                # Need to get the bytes of the data, those live after the RID and to the end of the block size
-                dataBytes = page.data[startByte + self.table.RID_SIZE : startByte + self.table.BLOCK_SIZE]
-                # Reconstruct the int that the datebytes represent
-                value = int.from_bytes(dataBytes, byteorder="big")
-                # If that value is the search_key that we're looking for, add it to the list of matching RIDs
-                if value == search_key:
-                    rid = int.from_bytes(ridBytes, byteorder="big")
-                    matchingRids.append(rid)
-
-        # If no matches, return false
-        if len(matchingRids) == 0:
-            return False
-
-        # Now grab each column that we're looking for via the input of projected_columns_index
-        for rid in matchingRids:
-            recordColumns = [None]*self.table.num_columns
-            for colIndex in range(self.table.num_columns):
-                if projected_columns_index[colIndex] == 1:
-                    valueFound = False
-                    columnPages = self.table.page_directory[colIndex]
-                    for page in columnPages:
-                        for i in range(page.num_records):
-                            startByte = i * self.table.BLOCK_SIZE
-                            ridBytes = page.data[startByte : startByte + self.table.RID_SIZE]
-                            currentRid = int.from_bytes(ridBytes, byteorder="big")
-
-                            if currentRid == rid:
-                                dataBytes = page.data[startByte + self.table.RID_SIZE : startByte + self.table.BLOCK_SIZE]
-                                value = int.from_bytes(dataBytes, byteorder="big")
-                                recordColumns[colIndex] = value
-                                valueFound = True
-                                break
-
-                        if valueFound:
-                            break
-
-            primaryKeyValue = recordColumns[self.table.key]
-            finalRecord = Record(rid, primaryKeyValue, recordColumns)
-            returnList.append(finalRecord)
-            # print("Returning: ", returnList)
-            return returnList
-    """
+        return return_list
 
     """
     # Read matching record with specified search key
@@ -140,19 +93,61 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
-    def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        pass
 
-    
+    def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
+        # get the indices of all matching records
+        indices = self.table.index.locate(search_key_index, search_key)
+
+        # get records from indices
+        records = []
+        for i in indices:
+            records.append(self.table.get_record(i))
+
+        records_dict = {}
+
+        # Sort out the returned indices uding records_dict
+        for record in records:
+            if record.rid not in records_dict.keys():
+                records_dict[record.rid] = [record]
+            else:
+                records_dict[record.rid].append(record)
+
+        # Take the most recent record from each collection of records
+        return_list = []
+        for k in records_dict.keys():
+            records_dict[k].sort()
+            if abs(relative_version) > len(records_dict[k]):
+                # I believe this is what the tester wants when the index is out of range (i.e. get base entry)
+                return_list.append(records_dict[k][0])
+            else:
+                # FIXME: not sure if should be records_dict[k][relative_version - 1] instead
+                return_list.append(records_dict[k][relative_version])
+
+        return return_list
+
     """
     # Update a record with specified key and columns
     # Returns True if update is succesful
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
-    def update(self, primary_key, *columns):
-        pass
 
-    
+    def update(self, primary_key, *columns):
+        # the most recently added record with matching primary_key is retrieved from database and stored as record
+        try:
+            record = self.select(primary_key, self.table.key, [1] * self.table.num_columns)[0]
+        except:
+            # Select failed so return false
+            return False
+        # create new Record object
+        updated_record = Record(record.rid, record.key, columns)
+        # retrieve index of previous record
+        old_index = self.table.index.locate(record.key, record.column(record.key)).copy().sort()[-1]
+        # add the record
+        self.table.add_record(updated_record, old_index)
+
+        # return True since successful
+        return True
+
     """
     :param start_range: int         # Start of the key range to aggregate 
     :param end_range: int           # End of the key range to aggregate 
@@ -161,10 +156,31 @@ class Query:
     # Returns the summation of the given range upon success
     # Returns False if no record exists in the given range
     """
-    def sum(self, start_range, end_range, aggregate_column_index):
-        pass
 
-    
+    def sum(self, start_range, end_range, aggregate_column_index):
+        columns_to_get = []
+        for i in range(aggregate_column_index - 1):
+            columns_to_get.append(0)
+        columns_to_get.append(1)
+        for i in range(self.table.num_columns - aggregate_column_index):
+            columns_to_get.append(0)
+        sum = 0
+        record_exists = False
+
+        for t in range(start_range, end_range + 1):
+            # only accesses the needed column
+            try:
+                sum += self.select(t, self.table.key, columns_to_get)[0].columns[
+                    0]  # FIXME: This might raise errors depending on how Record is implemented
+                record_exists = True
+            except:
+                continue
+
+        if record_exists:
+            return sum
+        else:
+            return False
+
     """
     :param start_range: int         # Start of the key range to aggregate 
     :param end_range: int           # End of the key range to aggregate 
@@ -174,10 +190,31 @@ class Query:
     # Returns the summation of the given range upon success
     # Returns False if no record exists in the given range
     """
-    def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
-        pass
 
-    
+    def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
+        columns_to_get = []
+        for i in range(aggregate_column_index - 1):
+            columns_to_get.append(0)
+        columns_to_get.append(1)
+        for i in range(self.table.num_columns - aggregate_column_index):
+            columns_to_get.append(0)
+        sum = 0
+        record_exists = False
+
+        for t in range(start_range, end_range + 1):
+            # only accesses the needed column
+            try:
+                sum += self.select_version(t, self.table.key, columns_to_get, relative_version)[0].columns[
+                    0]  # FIXME: This might raise errors depending on how Record is implemented
+                record_exists = True
+            except:
+                continue
+
+        if record_exists:
+            return sum
+        else:
+            return False
+
     """
     incremenets one column of the record
     this implementation should work if your select and update queries already work
@@ -186,6 +223,7 @@ class Query:
     # Returns True is increment is successful
     # Returns False if no record matches key or if target record is locked by 2PL.
     """
+
     def increment(self, key, column):
         r = self.select(key, self.table.key, [1] * self.table.num_columns)[0]
         if r is not False:
