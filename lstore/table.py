@@ -36,10 +36,14 @@ class Table:
         # initialize one page per column
         for i in range(self.num_columns):
             self.make_new_page(i)
+        
+        self.make_new_page(-1) # This will be the place to store pointers
 
     def __merge(self):
         print("merge is happening")
         pass
+
+    # def 
 
     def __convert_to_bytes(self, entry):
         if isinstance(entry, int):
@@ -52,13 +56,14 @@ class Table:
             raise TypeError("entry must be a str or int")
         return entry_as_bytes
 
-    def add_record(self, record: Record):
+    def add_record(self, record: Record, pointer=None):
         # If the record has too many or not enough columns, an error is raised
         if (len(record.columns) != self.num_columns):
             raise ValueError("Number of columns in Record object does not match number of columns in Table.")
         
         # increase rid counter so each new record as a unique rid
-        self.next_rid += 1
+        if pointer == None:
+            self.next_rid += 1
 
         # for each column in the record
         for i in range(len(record.columns)):
@@ -74,24 +79,30 @@ class Table:
             
             # write entry to page
             self.page_directory[i][-1].write(record_in_bytes)
+
+        self.page_directory[-1][-1].write(pointer) #FIXME: how to store a None object?
         
         return True
     
-    def make_new_page(self, column_index:int):
-        # FIXME: Possibly change the organization of page_directory
-        # during initiation, each column index is associated with an empty list
-        if column_index not in self.page_directory.keys():
-            self.page_directory[column_index] = []
+    # def update(self, updated_record):
 
-        # add pages for each column as needed
-        new_pid = "P-"+str(self.current_page)
-        new_path = "./TestData/"+self.name+"_"+new_pid
-        new_page = Page(new_pid, new_path, capacity=4096, size=self.BLOCK_SIZE)
-        self.current_page += 1
-        self.page_directory[column_index].append(new_page)
 
-        # FIXME: Possibly change what it returns
-        return True
+
+    # def make_new_page(self, column_index:int):
+    #     # FIXME: Possibly change the organization of page_directory
+    #     # during initiation, each column index is associated with an empty list
+    #     if column_index not in self.page_directory.keys():
+    #         self.page_directory[column_index] = []
+
+    #     # add pages for each column as needed
+    #     new_pid = "P-"+str(self.current_page)
+    #     new_path = "./TestData/"+self.name+"_"+new_pid
+    #     new_page = Page(new_pid, new_path, capacity=4096, size=self.BLOCK_SIZE)
+    #     self.current_page += 1
+    #     self.page_directory[column_index].append(new_page)
+
+    #     # FIXME: Possibly change what it returns
+    #     return True
 
     def get_record(self, rid, columns):
         index = self.index.locate(rid)
@@ -110,17 +121,17 @@ class Table:
         return record
  
 
-    # def make_new_page(self, column_index:int):
-    #     # FIXME: Possibly change the organization of page_directory
-    #     # during initiation, each column index is associated with an empty list
-    #     if column_index not in self.page_directory.keys():
-    #         self.page_directory[column_index] = []
+    def make_new_page(self, column_index:int):
+        # FIXME: Possibly change the organization of page_directory
+        # during initiation, each column index is associated with an empty list
+        if column_index not in self.page_directory.keys():
+            self.page_directory[column_index] = []
 
-    #     # add pages for each column as needed
-    #     # FIXME: For now every page has a fixed block size, later we might want to vary the block size per table
-    #     new_page = Page(self.BLOCK_SIZE)
+        # add pages for each column as needed
+        # FIXME: For now every page has a fixed block size, later we might want to vary the block size per table
+        new_page = Page(self.BLOCK_SIZE)
 
-    #     self.page_directory[column_index].append(new_page)
+        self.page_directory[column_index].append(new_page)
 
-    #     # FIXME: Possibly change what it returns
-    #     return True
+        # FIXME: Possibly change what it returns
+        return True
