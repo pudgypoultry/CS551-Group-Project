@@ -41,7 +41,9 @@ class Index:
         if self.indices[column] is not None:
             currentTree = self.indices[column]
             # self.indices is full of B+ trees for each column
-            return currentTree.query(value) # This is the leaf node where that value must live
+            return currentTree.query(value).values # This is the leaf node where that value must live
+            # the input to BPlusTree.query is the key we want to find, since RIDs are being stored in a list associated
+            #   with a value, the "value" here is the key associated with the RIDs
 
         else:
             return []
@@ -63,7 +65,6 @@ class Index:
                         # append rid of that record to rid_list
                         rid_list.append(rid)
 
-
         return rid_list
 
     """
@@ -74,10 +75,10 @@ class Index:
         self.indices[column_number] = BPlusTree(self.btree_order)
 
 
-    def add_to_index(self, column_number, value, rid):
+    def add_to_index(self, column_number, key, value):
         # use BPlusTree's __getitem__ to append the new rid to the respective value
-        if rid not in self.indices[column_number][value].append(rid):
-            self.indices[column_number] = self.indices[column_number][value].append(rid)
+        if value not in self.indices[column_number][key].append(value):
+            self.indices[column_number] = self.indices[column_number][key].append(value)
 
     """
     # optional: Drop index of specific column

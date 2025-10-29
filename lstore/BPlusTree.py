@@ -440,7 +440,7 @@ class BPlusTree(object):
 
 def demo():
     bplustree = BPlusTree()
-    random_list = random.sample(range(1, 1000), 100)
+    random_list = random.sample(range(1, 100), 20)
     for i in random_list:
         bplustree[i] = 'test' + str(i)
         print('Insert ' + str(i))
