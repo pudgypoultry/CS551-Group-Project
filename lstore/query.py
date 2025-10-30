@@ -61,7 +61,7 @@ class Query:
         except Exception:
             return False
         else:
-            return True
+            return records
 
     
     """
