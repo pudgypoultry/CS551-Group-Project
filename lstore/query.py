@@ -59,8 +59,10 @@ class Query:
             RIDs = self.table.index.locate(search_key_index, search_key)
             records = [self.table.fetch(rid) for rid in RIDs]
         except Exception:
+            # returns False if select fails for any reason
             return False
         else:
+            # returns list of records otherwise
             return records
 
     
