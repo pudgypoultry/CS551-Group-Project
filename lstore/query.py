@@ -32,13 +32,16 @@ class Query:
     def insert(self, *columns):
         # schema_encoding = '0' * self.table.num_columns
         try: 
-            self.table.insert(*columns)
+            status = self.table.insert(*columns)
         except Exception:
             # returns False if insert fails
             return False
         else:
             # returns True if Table.insert() works without error
-            return True
+            if status == True:
+                return True
+            else:
+                return False
 
 
     
