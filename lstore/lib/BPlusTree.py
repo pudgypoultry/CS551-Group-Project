@@ -194,6 +194,8 @@ class Leaf(Node):
         """
         Nearly the same as parent class, same idea tho
         """
+        if self.values[self.keys.index(item)] == None:
+            print("breakpoint")
         return self.values[self.keys.index(item)]
 
     def __setitem__(self, key, value):
@@ -202,8 +204,10 @@ class Leaf(Node):
         """
         i = self.index(key)
         if key not in self.keys:
-            self.keys[i:i] = [key]
-            self.values[i:i] = [value]
+            self.keys.insert(i, key)
+            self.values.insert(i, value)
+            if key is None or value is None:
+                print("why")
         else:
             self.values[i - 1] = value
 
@@ -337,7 +341,7 @@ class BPlusTree(object):
         """
         if leaf is None:
             leaf = self.find(key)
-        leaf[key] = value
+        leaf[key] = [value]
         if len(leaf.keys) > self.maximum:
             self.insert_index(*leaf.split())
 
@@ -348,11 +352,14 @@ class BPlusTree(object):
         """
         leaf = self.find(key)
         if key in leaf.keys:
+            print(leaf[key])
+            if leaf[key] is None:
+                print("break point")
+            leaf[key] = leaf[key].append(value)
             return False, leaf
         else:
             self.__setitem__(key, value, leaf)
             return True, leaf
-
 
     def insert_index(self, key, values: list[Node]):
         """

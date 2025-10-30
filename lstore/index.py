@@ -75,9 +75,10 @@ class Index:
 
 
     def add_to_index(self, column_number, value, rid):
-        # use BPlusTree's __getitem__ to append the new rid to the respective value
-        if rid not in self.indices[column_number][value].append(rid):
-            self.indices[column_number] = self.indices[column_number][value].append(rid)
+        # use BPlusTree's __getitem
+        if rid is None:
+            print("break point")
+        self.indices[column_number].insert(value, rid)
 
     """
     # optional: Drop index of specific column

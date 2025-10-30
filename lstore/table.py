@@ -107,8 +107,9 @@ class Table:
         status = True
         try:
             #Step-01: Insert record data into the physical pages and generate it's RID.
+
             RID = tuple([(self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])) for i in range(self.numColumns)]) #black magic. Do not question my fell powers of coding.
-            
+
             #Step-02: Insert new base record into the record directory and update active pages if they are full.
             map(self._updatePages, range(self.numColumns))
             self.recordDirectory[RID] = []
@@ -118,6 +119,7 @@ class Table:
                 self.index.add_to_index(i, columns[i], RID)
 
         except Exception as e:
+            print(e)
             status =  (False, e)
         
         #Step-04: Output true if the insert was successful or False if it was not.

@@ -32,7 +32,7 @@ class Query:
     def insert(self, *columns):
         # schema_encoding = '0' * self.table.num_columns
         try: 
-            self.table.insert(columns)
+            self.table.insert(*columns)
         except Exception:
             # returns False if insert fails
             return False
