@@ -359,7 +359,21 @@ class BPlusTree(object):
         """
         if leaf is None:
             leaf = self.find(key)
-        leaf[key] = [value]
+
+        if key in leaf.keys:
+            # Key exists, get the existing list
+            existing_list = leaf[key]
+
+            # Check if actually a list
+            if not isinstance(existing_list, list):
+                existing_list = []
+
+            existing_list.append(value)  # Append the new value
+            leaf[key] = existing_list  # This calls Leaf.__setitem__ to set the modified list
+        else:
+            # New key, create a new list
+            leaf[key] = [value]
+
         if len(leaf.keys) > self.maximum:
             self.insert_index(*leaf.split())
 
@@ -369,14 +383,15 @@ class BPlusTree(object):
             (bool,Leaf): the leaf where the key is inserted. return False if already has same key
         """
         leaf = self.find(key)
-        if key in leaf.keys:
-            print(leaf[key])
+        key_existed = key in leaf.keys
+
+        self[key] = value
+
+        if key_existed:
             if leaf[key] is None:
                 print("break point")
-            leaf[key] = leaf[key].append(value)
             return False, leaf
         else:
-            self.__setitem__(key, value, leaf)
             return True, leaf
 
     def insert_index(self, key, values: list[Node]):
@@ -468,6 +483,11 @@ def demo():
     random_list = random.sample(range(1, 100), 20)
     for i in random_list:
         bplustree[i] = 'test' + str(i)
+        print('Insert ' + str(i))
+        bplustree.show()
+
+    for i in random_list:
+        bplustree[i] = 'testtwo' + str(i)
         print('Insert ' + str(i))
         bplustree.show()
 
