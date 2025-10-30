@@ -41,7 +41,7 @@ class Index:
         if self.indices[column] is not None:
             currentTree = self.indices[column]
             # self.indices is full of B+ trees for each column
-            return currentTree.query(value) # This is the leaf node where that value must live
+            return currentTree.query(value).values # This is the leaf node where that value must live
 
         else:
             return []

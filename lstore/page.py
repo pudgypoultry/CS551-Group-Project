@@ -99,7 +99,7 @@ class Page:
         # self.log.debug(
         #    f"Data in array after writing: index-1: {self.data[(index - 8): ((index - 8) + 8)]} - index: {self.data[(index): ((index) + 8)]} - index+1: {self.data[(index + 8): ((index + 8) + 8)]}")
         # self.log.debug(f"Complete! Returning index: {index}")
-        self.num_records += 1
+        self.numRecords += 1
         return index
 
     def read(self, index):
@@ -129,4 +129,4 @@ class Page:
         # self.log.debug(f"Last 5 offsets before remove: {self.availableOffsets[-5:]}")
         self.availableOffsets.append(index)
         # self.log.debug(f"Last 5 offsets after remove: {self.availableOffsets[-5:]}")
-        self.num_records -= 1
+        self.numRecords -= 1

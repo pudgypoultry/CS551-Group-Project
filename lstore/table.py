@@ -143,10 +143,9 @@ class Table:
         except Exception as e:
             status = (False, e)
             
-
         return status
 
-    def fetch(self, RID, version=0):
+    def fetch(self, RID, version=-1):
         """
         Description: This method retrieves an item from the table
         """

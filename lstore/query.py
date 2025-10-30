@@ -53,7 +53,8 @@ class Query:
     """
     def select(self, search_key, search_key_index, projected_columns_index):
         try:
-            self.table.select_version(search_key, search_key_index, projected_columns_index)
+            RIDs = self.table.index.locate(search_key_index, search_key)
+            records = [self.table.fetch(rid) for rid in RIDs]
         except Exception:
             return False
         else:
