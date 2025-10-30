@@ -30,8 +30,16 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
-        schema_encoding = '0' * self.table.num_columns
-        pass
+        # schema_encoding = '0' * self.table.num_columns
+        try: 
+            self.table.insert(columns)
+        except Exception:
+            # returns False if insert fails
+            return False
+        else:
+            # returns True if Table.insert() works without error
+            return True
+
 
     
     """
@@ -44,7 +52,12 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select(self, search_key, search_key_index, projected_columns_index):
-        pass
+        try:
+            self.table.select_version(search_key, search_key_index, projected_columns_index)
+        except Exception:
+            return False
+        else:
+            return True
 
     
     """
@@ -58,7 +71,12 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        pass
+        try:
+            self.table.select_version(search_key, search_key_index, projected_columns_index, relative_version)
+        except Exception:
+            return False
+        else:
+            return True
 
     
     """
@@ -67,7 +85,14 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        pass
+        # same as insert, uses table.update
+        try:
+            self.table.update(primary_key, columns)
+        except Exception:
+            return False
+        else:
+            return True
+
 
     
     """
@@ -79,7 +104,27 @@ class Query:
     # Returns False if no record exists in the given range
     """
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+        # Set up
+        column_to_get = [0]*self.table.num_columns
+        column_to_get[aggregate_column_index] = 1
+        sum = 0
+        record_exists = False
+
+        for t in range(start_range, end_range + 1):
+            # only accesses the needed column
+            try:
+                # select only the needed column using primary key
+                # self.select(t, self.table.key, column_to_get) should return a list containing one record object
+                sum += self.select(t, self.table.key, column_to_get)[0].columns[0]
+                record_exists = True
+            except:
+                continue
+
+        if record_exists:
+            return sum
+        else:
+            # If there are no entries within the range return False
+            return False
 
     
     """
@@ -92,7 +137,28 @@ class Query:
     # Returns False if no record exists in the given range
     """
     def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
-        pass
+        # Set up
+        column_to_get = [0]*self.table.num_columns
+        column_to_get[aggregate_column_index] = 1
+        sum = 0
+        record_exists = False
+
+        for t in range(start_range, end_range + 1):
+            # only accesses the needed column
+            try:
+                # select only the needed column using primary key
+                # self.select(t, self.table.key, column_to_get) should return a list containing one record object
+                # this function is the same as sum, except for the following line using select_version instead of select
+                sum += self.select_version(t, self.table.key, column_to_get, relative_version)[0].columns[0]
+                record_exists = True
+            except:
+                continue
+
+        if record_exists:
+            return sum
+        else:
+            # If there are no entries within the range return False
+            return False
 
     
     """
