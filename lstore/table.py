@@ -77,6 +77,7 @@ class Table:
         self.tableName = tableName
         self.primaryKey = primaryKey
         self.numColumns = numColumns
+        self.num_columns = self.numColumns
         self.pageRange = [] #pages that we are activly using go here.
         self.availablePages = [[] for x in range(self.numColumns)] # a 2d array with an inner array for each column. Pages with available space go here.
         self.index = Index(self)
@@ -105,22 +106,17 @@ class Table:
         rid (str): rid of the new record. Format: [(PID, loc), ..., ()]
         """
         status = True
-        try:
-            #Step-01: Insert record data into the physical pages and generate it's RID.
-            RID = tuple([(self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])) for i in range(self.numColumns)]) #black magic. Do not question my fell powers of coding.
-            
-            #Step-02: Insert new base record into the record directory and update active pages if they are full.
-            map(self._updatePages, range(self.numColumns))
-            self.recordDirectory[RID] = []
-
-            #Step-03: Update the index
-            for i in range(self.numColumns):
-                self.index.add_to_index(i, columns[i], RID)
-
-        except Exception as e:
-            status =  (False, e)
+        #Step-01: Insert record data into the physical pages and generate it's RID.
+        RID = tuple([(self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])) for i in range(self.numColumns)]) #black magic. Do not question my fell powers of coding.
         
-        #Step-04: Output true if the insert was successful or False if it was not.
+        #Step-02: Insert new base record into the record directory and update active pages if they are full.
+        map(self._updatePages, range(self.numColumns))
+        self.recordDirectory[RID] = []
+
+        #Step-03: Update the index
+        for i in range(self.numColumns):
+            self.index.add_to_index(i, columns[i], RID)
+    #Step-04: Output true if the insert was successful or False if it was not.
         return status
  
 
@@ -151,7 +147,7 @@ class Table:
         """
         #step-01: lookup the record
         data = []
-        if(version == 0 and RID in self.pageDirectory):
+        if(version == 0 and RID in self.recordDirectory):
             #looking up the base record
             data = [self.pageDirectory[loc[0]].read(loc[1]) for loc in RID]
             return Record(RID, data[self.primaryKey], data)

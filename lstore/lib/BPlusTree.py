@@ -1,3 +1,4 @@
+
 """
 Documentation for the BPlusTree class.
 Author: Andrew Teske ateske@uoregon.edu
@@ -183,6 +184,7 @@ class Leaf(Node):
         Create a new leaf node
         """
         super(Leaf, self).__init__(parent)
+        self.values = {}
         self.next: Leaf = next_node
         if next_node is not None:
             next_node.prev = self
@@ -192,9 +194,9 @@ class Leaf(Node):
 
     def __getitem__(self, item):
         """
-        Nearly the same as parent class, same idea tho
+        Returns the value associated with 'item' (key) from the dictionary.
         """
-        return self.values[self.keys.index(item)]
+        return self.values[item]
 
     def __setitem__(self, key, value):
         """
@@ -202,10 +204,12 @@ class Leaf(Node):
         """
         i = self.index(key)
         if key not in self.keys:
-            self.keys[i:i] = [key]
-            self.values[i:i] = [value]
+            self.keys.insert(i, key)
+            self.values[key] = value
+            if key is None or value is None:
+                print("why")
         else:
-            self.values[i - 1] = value
+            self.values[key] = value
 
     def split(self):
         """
@@ -215,14 +219,24 @@ class Leaf(Node):
         global splits
         splits += 1
 
+        currentValues = self.values
         left = Leaf(self.parent, self.prev, self)
         mid = len(self.keys) // 2
 
         left.keys = self.keys[:mid]
-        left.values = self.values[:mid]
+        #print(left.keys)
+        #print(currentValues.keys())
+        #print("=====")
+        for key in left.keys:
+            #print(currentValues[key])
+            #print("=========")
+            left.values[key] = currentValues[key]
 
         self.keys: list = self.keys[mid:]
-        self.values: list = self.values[mid:]
+
+        for key in left.keys:
+            del self.values[key]
+        # self.values: list = self.values[mid:]
 
         # When the leaf node is split, set the parent key to the left-most key of the right child node.
         return self.keys[0], [left, self]
@@ -235,7 +249,7 @@ class Leaf(Node):
         """
         i = self.keys.index(key)
         del self.keys[i]
-        del self.values[i]
+        del self.values[key]
 
     def fusion(self):
         # For debugging
@@ -244,10 +258,17 @@ class Leaf(Node):
 
         if self.next is not None and self.next.parent == self.parent:
             self.next.keys[0:0] = self.keys
-            self.next.values[0:0] = self.values
+
+            for key in self.values.keys():
+                # EDITED
+                self.next[key] = self.values[key]
+                #self.next.values[0:0] = self.values
         else:
             self.prev.keys += self.keys
-            self.prev.values += self.values
+            for key in self.prev.values.keys():
+                # EDITED
+                self.prev.values[key] = self.values[key]
+                #self.prev.values += self.values
 
         if self.next is not None:
             self.next.prev = self.prev
@@ -257,13 +278,15 @@ class Leaf(Node):
     def borrow_key(self, minimum: int):
         index = self.parent.index(self.keys[0])
         if index < len(self.parent.keys) and len(self.next.keys) > minimum:
-            self.keys += [self.next.keys.pop(0)]
-            self.values += [self.next.values.pop(0)]
+            borrowedKey = self.next.keys.pop(0)
+            self.keys += [borrowedKey]
+            self.values[borrowedKey] = self.next.values[borrowedKey]
             self.parent.keys[index] = self.next.keys[0]
             return True
         elif index != 0 and len(self.prev.keys) > minimum:
-            self.keys[0:0] = [self.prev.keys.pop()]
-            self.values[0:0] = [self.prev.values.pop()]
+            borrowedKey = self.prev.keys.pop()
+            self.keys[0:0] = borrowedKey
+            self.values[borrowedKey] = self.prev.values[borrowedKey]
             self.parent.keys[index - 1] = self.keys[0]
             return True
 
@@ -337,7 +360,21 @@ class BPlusTree(object):
         """
         if leaf is None:
             leaf = self.find(key)
-        leaf[key] = value
+
+        if key in leaf.keys:
+            # Key exists, get the existing list
+            existing_list = leaf[key]
+
+            # Check if actually a list
+            if not isinstance(existing_list, list):
+                existing_list = []
+
+            existing_list.append(value)  # Append the new value
+            leaf[key] = existing_list  # This calls Leaf.__setitem__ to set the modified list
+        else:
+            # New key, create a new list
+            leaf[key] = [value]
+
         if len(leaf.keys) > self.maximum:
             self.insert_index(*leaf.split())
 
@@ -347,12 +384,16 @@ class BPlusTree(object):
             (bool,Leaf): the leaf where the key is inserted. return False if already has same key
         """
         leaf = self.find(key)
-        if key in leaf.keys:
+        key_existed = key in leaf.keys
+
+        self[key] = value
+
+        if key_existed:
+            if leaf[key] is None:
+                print("break point")
             return False, leaf
         else:
-            self.__setitem__(key, value, leaf)
             return True, leaf
-
 
     def insert_index(self, key, values: list[Node]):
         """
@@ -440,9 +481,14 @@ class BPlusTree(object):
 
 def demo():
     bplustree = BPlusTree()
-    random_list = random.sample(range(1, 1000), 100)
+    random_list = random.sample(range(1, 100), 20)
     for i in random_list:
         bplustree[i] = 'test' + str(i)
+        print('Insert ' + str(i))
+        bplustree.show()
+
+    for i in random_list:
+        bplustree[i] = 'testtwo' + str(i)
         print('Insert ' + str(i))
         bplustree.show()
 

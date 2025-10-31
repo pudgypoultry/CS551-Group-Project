@@ -11,7 +11,7 @@ class Query:
     """
     def __init__(self, table):
         self.table = table
-        pass
+        self.flag = False
 
     
     """
@@ -32,13 +32,17 @@ class Query:
     def insert(self, *columns):
         # schema_encoding = '0' * self.table.num_columns
         try: 
-            self.table.insert(columns)
-        except Exception:
+            status = self.table.insert(columns)
+        except Exception as e:
             # returns False if insert fails
+            print(f"Error: {e}")
             return False
         else:
             # returns True if Table.insert() works without error
-            return True
+            if status == True:
+                return True
+            else:
+                return False
 
 
     
@@ -52,13 +56,38 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select(self, search_key, search_key_index, projected_columns_index):
-        try:
+        # try:
+            records = []
             RIDs = self.table.index.locate(search_key_index, search_key)
-            records = [self.table.fetch(rid) for rid in RIDs]
-        except Exception:
-            return False
-        else:
-            return True
+            if RIDs == None:
+                print("RIDs is null, ",search_key_index, search_key)
+            for rid in RIDs:
+                # This if/else checks if the record has ever been updated
+                if len(self.table.recordDirectory[rid]) == 0:
+                    record = self.table.fetch(rid, 0) 
+                else:
+                    record = self.table.fetch(rid) 
+
+                # FIXME: This process of only selecting the desired columns WILL be optimized so as to capitalize on columnar approach
+                new_columns = []
+                for i in range(self.table.numColumns):
+                    if projected_columns_index[i] == 1:
+                        new_columns.append(record.columns[i])
+
+                # has_key = projected_columns_index[self.table.primaryKey] == 1
+                # new_record_key = record.key if has_key else None
+                # FIXME: The primary key is set to be the original primary key, even though the shortened record may not contain it.
+                new_record = Record(rid, record.key, new_columns)
+                records.append(new_record)
+            # RIDs = self.table.index.locate(search_key_index, search_key)
+            # records = [self.table.fetch(rid) for rid in RIDs]
+        # except Exception:
+            # returns False if select fails for any reason
+            # removed for debugging purposes so as to actually see the errors
+            # return False
+        # else:
+            # returns list of records otherwise
+            return records
 
     
     """
@@ -72,12 +101,33 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        try:
-            self.table.select_version(search_key, search_key_index, projected_columns_index, relative_version)
-        except Exception:
-            return False
-        else:
-            return True
+        if(self.flag):
+            print("The record was never inserted")
+        records = []
+        RIDs = self.table.index.locate(search_key_index, search_key)
+        if RIDs == None:
+            print("select_version (error): RIDs is null, ",search_key_index, search_key)
+        for rid in RIDs:
+            # This if/else checks if relative_version is out of range => return base record
+            if len(self.table.recordDirectory[rid]) < abs(relative_version):
+                # return base record
+                record = self.table.fetch(rid, 0) 
+            else:
+                record = self.table.fetch(rid, relative_version - 1) 
+
+            # FIXME: This process of only selecting the desired columns WILL be optimized so as to capitalize on columnar approach
+            new_columns = []
+            for i in range(self.table.numColumns):
+                if projected_columns_index[i] == 1:
+                    new_columns.append(record.columns[i])
+
+            # has_key = projected_columns_index[self.table.primaryKey] == 1
+            # new_record_key = record.key if has_key else None
+            # FIXME: The primary key is set to be the original primary key, even though the shortened record may not contain it.
+            new_record = Record(rid, record.key, new_columns)
+            records.append(new_record)
+        return records
+    
 
     
     """
@@ -113,13 +163,13 @@ class Query:
 
         for t in range(start_range, end_range + 1):
             # only accesses the needed column
-            try:
+            #try:
                 # select only the needed column using primary key
                 # self.select(t, self.table.key, column_to_get) should return a list containing one record object
-                sum += self.select(t, self.table.key, column_to_get)[0].columns[0]
+                sum += self.select(t, self.table.primary_key, column_to_get)[0].columns[0]
                 record_exists = True
-            except:
-                continue
+            #except:
+                #continue
 
         if record_exists:
             return sum

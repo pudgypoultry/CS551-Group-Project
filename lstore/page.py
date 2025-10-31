@@ -115,7 +115,7 @@ class Page:
         data = self.data[index: (index + 8)]
         # self.log.debug(
         #    f"data(raw): {data} - decoded: {data.decode('utf-8')} - trimmed: {data.decode('utf-8').replace('-', '')}")
-        data = data.decode('utf-8').replace('=', '')
+        data = int(data.decode('utf-8').replace('=', ''))
         # self.log.debug(f"Read complete returning data: {data}")
         return data
 
