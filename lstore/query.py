@@ -30,6 +30,7 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
+        """
         # schema_encoding = '0' * self.table.num_columns
         try: 
             status = self.table.insert(columns)
@@ -43,6 +44,10 @@ class Query:
                 return True
             else:
                 return False
+        """
+        print(columns)
+        self.table.insert(*columns)
+
 
 
     
@@ -101,8 +106,6 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        if(self.flag):
-            print("The record was never inserted")
         records = []
         RIDs = self.table.index.locate(search_key_index, search_key)
         if RIDs == None:

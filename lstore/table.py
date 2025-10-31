@@ -94,7 +94,7 @@ class Table:
             pNum = int(self.pageRange[col].split('-')[2])+1
             self.pageDirectory[f"P-{col}-{pNum}"] = Page(f"P-{col}-{pNum}")
             self.pageRange[col] = f"P-{col}-{pNum}"
-            self.availablePages[col].remove(f"P-{col}-{pNum-1}")
+            #self.availablePages[col].remove(f"P-{col}-{pNum-1}")
 
     def insert(self, *columns):
         """
@@ -107,6 +107,10 @@ class Table:
         """
         status = True
         #Step-01: Insert record data into the physical pages and generate it's RID.
+        if(not self.pageDirectory[self.pageRange[0]].hasCapacity()):
+            print("pause...")
+            map(self._updatePages, range(self.numColumns))
+
         RID = tuple([(self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])) for i in range(self.numColumns)]) #black magic. Do not question my fell powers of coding.
         
         #Step-02: Insert new base record into the record directory and update active pages if they are full.
