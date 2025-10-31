@@ -224,19 +224,13 @@ class Leaf(Node):
         mid = len(self.keys) // 2
 
         left.keys = self.keys[:mid]
-        #print(left.keys)
-        #print(currentValues.keys())
-        #print("=====")
         for key in left.keys:
-            #print(currentValues[key])
-            #print("=========")
             left.values[key] = currentValues[key]
 
         self.keys: list = self.keys[mid:]
 
         for key in left.keys:
             del self.values[key]
-        # self.values: list = self.values[mid:]
 
         # When the leaf node is split, set the parent key to the left-most key of the right child node.
         return self.keys[0], [left, self]
@@ -260,15 +254,11 @@ class Leaf(Node):
             self.next.keys[0:0] = self.keys
 
             for key in self.values.keys():
-                # EDITED
                 self.next[key] = self.values[key]
-                #self.next.values[0:0] = self.values
         else:
             self.prev.keys += self.keys
             for key in self.prev.values.keys():
-                # EDITED
                 self.prev.values[key] = self.values[key]
-                #self.prev.values += self.values
 
         if self.next is not None:
             self.next.prev = self.prev
@@ -434,18 +424,6 @@ class BPlusTree(object):
             elif not node.borrow_key(self.minimum):
                 node.fusion()
                 self.delete(key, node.parent)
-        # Change the left-most key in node
-        # if i == 0:
-        #     node = self
-        #     while i == 0:
-        #         if node.parent is None:
-        #             if len(node.keys) > 0 and node.keys[0] == key:
-        #                 node.keys[0] = self.keys[0]
-        #             return
-        #         node = node.parent
-        #         i = node.index(key)
-        #
-        #     node.keys[i - 1] = self.keys[0]
 
     def show(self, node=None, file=None, _prefix="", _last=True):
         """Prints the keys at each level."""

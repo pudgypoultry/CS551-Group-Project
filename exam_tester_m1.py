@@ -33,7 +33,7 @@ for i in range(0, number_of_records):
     query.insert(*records[key])
     # print('inserted', records[key])
 print("Insert finished")
-input(">>>")
+
 
 # Check inserted records using select query
 for key in records:
@@ -50,7 +50,7 @@ for key in records:
     else:
         pass
         # print('select on', key, ':', record)
-input("initial select >>>")
+print("initial select >>>")
 
 updated_records = {}
 for key in records:
@@ -71,7 +71,8 @@ for key in records:
         if column != records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
+        print('update error on', records[key], 'and', updated_columns, ':', record.columns, ', correct:', records[key])
+        print("Error: version -1")
     else:
         pass
         # print('update on', original, 'and', updated_columns, ':', record)
@@ -82,7 +83,8 @@ for key in records:
         if column != records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
+        print('update error on', records[key], 'and', updated_columns, ':', record.columns, ', correct:', records[key])
+        print("Error: version -2")
     else:
         pass
         # print('update on', original, 'and', updated_columns, ':', record)
@@ -94,9 +96,10 @@ for key in records:
         if column != updated_records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', updated_records[key])
-input("Update>>>")
+        print('update error on', records[key], 'and', updated_columns, ':', record.columns, ', correct:', updated_records[key])
+        print("Error: version 0")
 
+print("update passed>>>")
 keys = sorted(list(records.keys()))
 # aggregate on every column 
 for c in range(0, grades_table.num_columns):
@@ -125,4 +128,4 @@ for c in range(0, grades_table.num_columns):
             print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', updated_result, ', correct: ', updated_column_sum)
         else:
             pass
-input("aggragate test>>>")
+print("aggragate test>>>")

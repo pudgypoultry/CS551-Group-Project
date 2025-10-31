@@ -21,7 +21,7 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        pass
+        return self.table.delete(primary_key)
     
     
     """
@@ -30,23 +30,8 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
-        """
         # schema_encoding = '0' * self.table.num_columns
-        try: 
-            status = self.table.insert(columns)
-        except Exception as e:
-            # returns False if insert fails
-            print(f"Error: {e}")
-            return False
-        else:
-            # returns True if Table.insert() works without error
-            if status == True:
-                return True
-            else:
-                return False
-        """
-        print(columns)
-        self.table.insert(*columns)
+        return self.table.insert(*columns)
 
 
 
@@ -64,8 +49,6 @@ class Query:
         # try:
             records = []
             RIDs = self.table.index.locate(search_key_index, search_key)
-            if RIDs == None:
-                print("RIDs is null, ",search_key_index, search_key)
             for rid in RIDs:
                 # This if/else checks if the record has ever been updated
                 if len(self.table.recordDirectory[rid]) == 0:
@@ -84,14 +67,6 @@ class Query:
                 # FIXME: The primary key is set to be the original primary key, even though the shortened record may not contain it.
                 new_record = Record(rid, record.key, new_columns)
                 records.append(new_record)
-            # RIDs = self.table.index.locate(search_key_index, search_key)
-            # records = [self.table.fetch(rid) for rid in RIDs]
-        # except Exception:
-            # returns False if select fails for any reason
-            # removed for debugging purposes so as to actually see the errors
-            # return False
-        # else:
-            # returns list of records otherwise
             return records
 
     
@@ -108,15 +83,16 @@ class Query:
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
         records = []
         RIDs = self.table.index.locate(search_key_index, search_key)
-        if RIDs == None:
-            print("select_version (error): RIDs is null, ",search_key_index, search_key)
         for rid in RIDs:
             # This if/else checks if relative_version is out of range => return base record
-            if len(self.table.recordDirectory[rid]) < abs(relative_version):
-                # return base record
-                record = self.table.fetch(rid, 0) 
+            if len(self.table.recordDirectory[rid]) <= abs(relative_version):
+                # Case 1: return the base record
+                rVersion = 0
             else:
-                record = self.table.fetch(rid, relative_version - 1) 
+                # Case 2: return a tail record
+                rVersion = relative_version-1
+                
+            record = self.table.fetch(rid, rVersion) 
 
             # FIXME: This process of only selecting the desired columns WILL be optimized so as to capitalize on columnar approach
             new_columns = []
@@ -140,12 +116,9 @@ class Query:
     """
     def update(self, primary_key, *columns):
         # same as insert, uses table.update
-        try:
-            self.table.update(primary_key, columns)
-        except Exception:
-            return False
-        else:
-            return True
+        status = self.table.update(primary_key, *columns)
+        return status
+        
 
 
     
@@ -159,20 +132,21 @@ class Query:
     """
     def sum(self, start_range, end_range, aggregate_column_index):
         # Set up
-        column_to_get = [0]*self.table.num_columns
+        column_to_get = [0]*self.table.numColumns
         column_to_get[aggregate_column_index] = 1
         sum = 0
         record_exists = False
 
         for t in range(start_range, end_range + 1):
             # only accesses the needed column
-            #try:
+            try:
                 # select only the needed column using primary key
                 # self.select(t, self.table.key, column_to_get) should return a list containing one record object
-                sum += self.select(t, self.table.primary_key, column_to_get)[0].columns[0]
+                val_to_add = self.select(t, self.table.primaryKey, [1]*self.table.numColumns)[0].columns[aggregate_column_index]
+                sum += val_to_add
                 record_exists = True
-            #except:
-                #continue
+            except:
+                continue
 
         if record_exists:
             return sum
@@ -192,7 +166,7 @@ class Query:
     """
     def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
         # Set up
-        column_to_get = [0]*self.table.num_columns
+        column_to_get = [0]*self.table.numColumns
         column_to_get[aggregate_column_index] = 1
         sum = 0
         record_exists = False
@@ -202,8 +176,8 @@ class Query:
             try:
                 # select only the needed column using primary key
                 # self.select(t, self.table.key, column_to_get) should return a list containing one record object
-                # this function is the same as sum, except for the following line using select_version instead of select
-                sum += self.select_version(t, self.table.key, column_to_get, relative_version)[0].columns[0]
+                val_to_add = self.select_version(t, self.table.primaryKey, [1]*self.table.numColumns, relative_version)[0].columns[aggregate_column_index]
+                sum += val_to_add
                 record_exists = True
             except:
                 continue
@@ -214,7 +188,6 @@ class Query:
             # If there are no entries within the range return False
             return False
 
-    
     """
     incremenets one column of the record
     this implementation should work if your select and update queries already work

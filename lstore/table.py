@@ -3,7 +3,7 @@ Documentation for the page class.
 Author: Jared Hall jhall10@uoregon.edu
 Description:
     This file contains our implementation of the core storage data structure for our L-Store database.
-    The page class contains all of the necessary operations for the page. See the method documentation
+    The table class contains all of the necessary operations for the table. See the method documentation
     for a detailed breakdown of all methods. 
 """
 
@@ -58,7 +58,7 @@ class Table:
             numColumns (int): The number of columns that records saved in this table will have.
 
         Outputs:
-            Page Object
+            table Object
 
         Internal Objects:
             tableName (str): The name of this table.
@@ -90,6 +90,7 @@ class Table:
             self.availablePages[i].append(PID)
 
     def _updatePages(self, col):
+        print("Making new pages")
         if(self.pageDirectory[self.pageRange[col]].hasCapacity() == False):
             pNum = int(self.pageRange[col].split('-')[2])+1
             self.pageDirectory[f"P-{col}-{pNum}"] = Page(f"P-{col}-{pNum}")
@@ -106,44 +107,59 @@ class Table:
         rid (str): rid of the new record. Format: [(PID, loc), ..., ()]
         """
         status = True
-        #Step-01: Insert record data into the physical pages and generate it's RID.
-        if(not self.pageDirectory[self.pageRange[0]].hasCapacity()):
-            print("pause...")
-            map(self._updatePages, range(self.numColumns))
-
-        RID = tuple([(self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])) for i in range(self.numColumns)]) #black magic. Do not question my fell powers of coding.
+        RID = []
+        for i in range(self.numColumns):
+            #Step-01: check if page is full
+            if(not self.pageDirectory[self.pageRange[i]].hasCapacity()):
+                #... if it is then make a new page.
+                pNum = int(self.pageRange[i].split('-')[2])+1
+                self.pageDirectory[f"P-{i}-{pNum}"] = Page(f"P-{i}-{pNum}")
+                self.pageRange[i] = f"P-{i}-{pNum}"
+            
+            #Step-02: Insert record data into the physical pages and generate it's RID.
+            RID.append((self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])))
+        RID = tuple(RID)
+        self.recordDirectory[RID] = [RID]
         
-        #Step-02: Insert new base record into the record directory and update active pages if they are full.
-        map(self._updatePages, range(self.numColumns))
-        self.recordDirectory[RID] = []
-
         #Step-03: Update the index
         for i in range(self.numColumns):
             self.index.add_to_index(i, columns[i], RID)
-    #Step-04: Output true if the insert was successful or False if it was not.
+        #Step-04: Output true if the insert was successful or False if it was not.
         return status
  
 
     def delete(self, primaryKey):
-        RID = self.index.locate(0, primaryKey) #only base record rids are stored in index.
+        RID = self.index.locate(0, primaryKey)[0] #only base record rids are stored in index.
         self.recordDirectory[RID] = -1
 
     def update(self, primaryKey, *columns):
-        status = True
-        try:
-            # Step-01: Find the RID of the record to be updated.
-            RID = self.index.locate(0, primaryKey) #only base record rids are stored in index.
+        # Step-01: Find the RID of the record to be updated.
+        baseRID = self.index.locate(0, primaryKey)[0] #only base record rids are stored in index.
+        if(len(baseRID) == 0):
+            return False
 
-            #step-02: Create tail record by appending new value to physical pages
-            tRID = tuple([(self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])) for i in range(self.numColumns)])
+        # Step-02: Get the last version
+        RID = self.recordDirectory[baseRID][-1]
 
-            #Step-03: update pages and record dir.
-            map(self._updatePages, range(self.numColumns))
-            self.recordDirectory[RID].append(tRID)
-        except Exception as e:
-            status = (False, e)
-            
-        return status
+
+        tRID = []
+        #step-02: Create tail record by appending new value to physical pages
+        for i in range(self.numColumns):
+            #Step-01: check if page is full
+            if(not self.pageDirectory[self.pageRange[i]].hasCapacity()):
+                #... if it is then make a new page.
+                pNum = int(self.pageRange[i].split('-')[2])+1
+                self.pageDirectory[f"P-{i}-{pNum}"] = Page(f"P-{i}-{pNum}")
+                self.pageRange[i] = f"P-{i}-{pNum}"
+        
+            #Step-02: Insert record data into the physical pages and generate it's RID.
+            if(columns[i] is None):
+                tRID.append(RID[i])
+            else:
+                tRID.append((self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])))
+
+        self.recordDirectory[baseRID].append(tuple(tRID))
+        return True
 
     def fetch(self, RID, version=-1):
         """
@@ -151,14 +167,19 @@ class Table:
         """
         #step-01: lookup the record
         data = []
-        if(version == 0 and RID in self.recordDirectory):
-            #looking up the base record
-            data = [self.pageDirectory[loc[0]].read(loc[1]) for loc in RID]
-            return Record(RID, data[self.primaryKey], data)
-        elif(version != 0 and RID in self.pageDirectory):
-            #lookup the version in record dir
-            tRID = self.recordDirectory[RID][version]
-            data = [self.pageDirectory[loc[0]].read(loc[1]) for loc in tRID]
-            return Record(RID, data[self.primaryKey], data)
+        if(RID in self.recordDirectory):
+            if(version == 0 and self.recordDirectory[RID] != -1):
+                #looking up the base record
+                data = [self.pageDirectory[loc[0]].read(loc[1]) for loc in RID]
+                return Record(RID, data[self.primaryKey], data)
+            elif(version != 0 and self.recordDirectory[RID] != -1):
+                #lookup the version in record dir
+                tRID = self.recordDirectory[RID][version]
+                data = [self.pageDirectory[loc[0]].read(loc[1]) for loc in tRID]
+                return Record(RID, data[self.primaryKey], data)
+            else:
+                return False
+        else:
+                return False
 
             

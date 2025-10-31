@@ -36,10 +36,6 @@ class Page:
             pageID (str): A unique identifier for this physical page.
             PageID Format: P-<column>-<page number>, e.g., P-0-0 is the ID for the first page of the first column.
         """
-        # self.log = logging.getLogger(self.__class__.__name__)
-        # self.log = setupLogger(False, "DEBUG", self.log, 12)
-
-        # self.log.debug(f"Params | pid: {pid} - capacity: {capacity} - size: {size}")
         self.numRecords = 0
         self.capacity = 0
         self.entrySize = size
@@ -61,9 +57,6 @@ class Page:
             err = "ERROR: Parameter <capacity> must be a non-zero integer."
             raise TypeError(err)
 
-        # self.log.debug(
-        #    f"Initial offset array length: {len(self.availableOffsets)} - Array: \n{self.availableOffsets}\n")
-        # self.log.debug(f"Page created!")
 
     def hasCapacity(self):
         """
@@ -73,8 +66,6 @@ class Page:
         Ouputs:
             Boolean: <True> if there is enough space, else <False>
         """
-        # self.log.debug(
-        #    f"Checking capacity. Number of available slots: {len(self.availableOffsets)} - conditional: {True if (len(self.availableOffsets) > 0) else False}")
         return True if (len(self.availableOffsets) > 0) else False
 
     def write(self, value):
@@ -85,20 +76,9 @@ class Page:
         Outputs:
             index (int): The integer index that the data was stored at.
         """
-        # self.log.debug(f"Write called! Writing value: {value} to the pages data array.")
-        # self.log.debug(f"First 5 offsets: {self.availableOffsets[:5]}")
-        # self.log.debug(f"Fetching smallest available offset. Length of offsets: {len(self.availableOffsets)}")
         index = self.availableOffsets.pop()
-        # self.log.debug(f"Got offset: {index} - Length of offsets: {len(self.availableOffsets)}")
-        # self.log.debug(f"Slice of the data array we are writing to: [{index}, {index + 8}]")
         data = str(value).ljust(8, '=').encode('utf-8')
-        # self.log.debug(f"Value(raw): {value} - value(str): {str(value)} - Encoded value: {data}")
-        # self.log.debug(
-        #    f"Data in array before writing: index-1: {self.data[(index - 8): ((index - 8) + 8)]} - index: {self.data[(index): ((index) + 8)]} - index+1: {self.data[(index + 8): ((index + 8) + 8)]}")
         self.data[index: (index + 8)] = data
-        # self.log.debug(
-        #    f"Data in array after writing: index-1: {self.data[(index - 8): ((index - 8) + 8)]} - index: {self.data[(index): ((index) + 8)]} - index+1: {self.data[(index + 8): ((index + 8) + 8)]}")
-        # self.log.debug(f"Complete! Returning index: {index}")
         self.numRecords += 1
         return index
 
@@ -108,15 +88,8 @@ class Page:
         Inputs:
             index (int): the index of the value you wanna read.
         """
-        # self.log.debug(f"Read called! Reading value in data array from position <index>: {index}")
-        # self.log.debug(f"Slice of the data array we are reading from: [{index}, {index + 8}]")
-        # self.log.debug(
-        #    f"Data in array adjecent to {index}: index-1: {self.data[(index - 8): ((index - 8) + 8)]} - index: {self.data[(index): ((index) + 8)]} - index+1: {self.data[(index + 8): ((index + 8) + 8)]}")
         data = self.data[index: (index + 8)]
-        # self.log.debug(
-        #    f"data(raw): {data} - decoded: {data.decode('utf-8')} - trimmed: {data.decode('utf-8').replace('-', '')}")
         data = int(data.decode('utf-8').replace('=', ''))
-        # self.log.debug(f"Read complete returning data: {data}")
         return data
 
     def remove(self, index):
@@ -125,8 +98,5 @@ class Page:
         Inputs:
             index (int): the index of the value you wanna delete.
         """
-        # self.log.debug(f"Remove called! Adding index to list of available offsets...")
-        # self.log.debug(f"Last 5 offsets before remove: {self.availableOffsets[-5:]}")
         self.availableOffsets.append(index)
-        # self.log.debug(f"Last 5 offsets after remove: {self.availableOffsets[-5:]}")
         self.numRecords -= 1
