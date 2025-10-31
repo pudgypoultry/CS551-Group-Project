@@ -163,7 +163,8 @@ class Query:
             #try:
                 # select only the needed column using primary key
                 # self.select(t, self.table.key, column_to_get) should return a list containing one record object
-                sum += self.select(t, self.table.primary_key, column_to_get)[0].columns[0]
+                
+                sum += self.select(t, self.table.primary_key, [1]*self.table.numColumns)[0].columns[aggregate_column_index]
                 record_exists = True
             #except:
                 #continue
