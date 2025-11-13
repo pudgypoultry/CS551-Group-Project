@@ -70,7 +70,13 @@ class Database():
     TODO: Grab reference to page needed and open it here, can replace column/pagenumber with the page itself
     """
     def open_page(self, column, pageNumber):
-        self.add_to_bufferpool(column, pageNumber)
+        pages = [x[0] for x in self.bufferPool]
+        if (column, pageNumber) in pages:
+            i = pages.index((column, pageNumber))
+            currentPage = self.bufferPool.pop(i)
+            self.bufferPool.append(currentPage)
+        else:
+            self.add_to_bufferpool(column, pageNumber)
 
     """
     Add the page to the bufferpool, make sure to boot out oldest page before adding new one if too many are stored
