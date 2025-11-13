@@ -1,14 +1,102 @@
+import time
+import os
+import logging
+
+"""
+Documentation for the page class.
+Author: Jared Hall jhall10@uoregon.edu
+Description:
+    This file contains our implementation of the core storage data structure for our L-Store database.
+    The page class contains all of the necessary operations for the page. See the method documentation
+    for a detailed breakdown of all methods. 
+"""
 
 class Page:
 
-    def __init__(self):
-        self.num_records = 0
-        self.data = bytearray(4096)
+    def __init__(self, pid, capacity=4096, size=8):
+        """
+        Description: The physical page of our columnar storage. A page contains a single column of data.
+        Inputs:
+            pid (str): A unique numerical intentifier for this page. Format: "P-<int>"
+            capacity (int): A numerical value which determines the size of the storage unit.
+            size (int): A numerical value containing the fixed length of all data to be inserted into the column.
 
-    def has_capacity(self):
-        pass
+        Outputs:
+            Page Object
+
+        Internal Objects:
+            numRecords (int): the number of records held by this physical page.
+            capacity (int): A numerical value which determines the size of the data array in bytes.
+            entrySize (int): The fixed size of each entry.
+            data (ByteArray): The actual data of the column in bytes
+            maxEntries (int): The maximum number of entries (max = capacity//entrySize)
+            availableOffsets (list): A list of open indecees in the data array.
+                                    Format:
+                                            [idx_1, idx_2, ..., idx_n]
+            pageID (str): A unique identifier for this physical page.
+            PageID Format: P-<column>-<page number>, e.g., P-0-0 is the ID for the first page of the first column.
+        """
+        self.numRecords = 0
+        self.capacity = 0
+        self.entrySize = size
+        self.data = bytearray(1)
+        self.availableOffsets = []
+
+        if (type(pid) != type("str") or "P-" not in pid):
+            err = "ERROR: Parameter <pid> must be a string in the format P-<int>."
+            raise TypeError(err)
+        else:
+            self.pageID = pid
+
+        if (type(capacity) == type(1) and capacity > 0):
+            self.data = bytearray(capacity)
+            self.capacity = capacity
+            self.availableOffsets = [x for x in range(capacity - size, -size, -size)]
+            self.maxEntries = capacity // size
+        else:
+            err = "ERROR: Parameter <capacity> must be a non-zero integer."
+            raise TypeError(err)
+
+
+    def hasCapacity(self):
+        """
+        Description: This function checks if there is enough space to write to the page.
+        Inputs:
+            size (int): the number of bytes you want to write to the page
+        Ouputs:
+            Boolean: <True> if there is enough space, else <False>
+        """
+        return True if (len(self.availableOffsets) > 0) else False
 
     def write(self, value):
-        self.num_records += 1
-        pass
+        """
+        Description: A simple write method. Will insert new data to array.
+        Inputs:
+            value (any): The data value to be stored. Will be encoded as a string.
+        Outputs:
+            index (int): The integer index that the data was stored at.
+        """
+        index = self.availableOffsets.pop()
+        data = str(value).ljust(8, '=').encode('utf-8')
+        self.data[index: (index + 8)] = data
+        self.numRecords += 1
+        return index
 
+    def read(self, index):
+        """"
+        Description: A simple read method. Returns data by index from the page if the key exists.
+        Inputs:
+            index (int): the index of the value you wanna read.
+        """
+        data = self.data[index: (index + 8)]
+        data = int(data.decode('utf-8').replace('=', ''))
+        return data
+
+    def remove(self, index):
+        """
+        Description: Removes data in the page from the given index.
+        Inputs:
+            index (int): the index of the value you wanna delete.
+        """
+        self.availableOffsets.append(index)
+        self.numRecords -= 1
