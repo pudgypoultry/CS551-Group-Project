@@ -123,6 +123,7 @@ class Page:
         """
         status = True
         try:
+
             with open(f"{self.path}/{self.pageID}.data", "w") as outfile:
                 outfile.write(str(self.numRecords))
                 outfile.write(str(self.capacity))
@@ -134,6 +135,7 @@ class Page:
                 outfile.write(bytes(self.data))
             
             self.isdirty = False
+
         except Exception as e:
             status = False
             print(f"Page load error: {e}")
@@ -141,6 +143,7 @@ class Page:
     def load(self):
         status = True
         try:
+
             with open(f"{self.path}/{self.pageID}.data", "r") as infile:
                 self.numRecords =  int(infile.readline().strip())
                 self.capacity = int(infile.readline().strip())
@@ -160,4 +163,13 @@ class Page:
     def isDirty(self):
         return self.isdirty
 
-    
+
+if __name__ == "__main__":
+    # Change to parent directory
+    os.chdir('..')
+    test_pid = ("P-blah")
+    Page(test_pid,capacity=4048).save()
+
+    loaded = Page(test_pid,capacity=4048).load()
+    loaded
+
