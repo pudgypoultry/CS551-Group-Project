@@ -27,14 +27,33 @@ class Database():
 
         Ultimately, we'll replace column/pagenumber (the first item of each entry in bufferpool) with the page itself
         """
+
+
+        self.tables = {}
         self.bufferPool = []
         self.bufferPoolPIDs = []
         self.currentTable = None
         self.openTables = []
         self.numPagesInMemory = 0
 
-        self.page_buffer = PageBuffer(capacity=64, pages_path="./pages")  # Default buffer
-        self.path = "./"  # Default path
+        # Set defaults that work even without open()
+        self.page_buffer = None
+        self.path = None
+
+    def _ensure_initialized(self):
+        """Ensure page_buffer exists even if open() wasn't called"""
+        if self.page_buffer is None:
+            self.path = "./"
+            os.makedirs(self.path, exist_ok=True)
+            os.makedirs(self.pages_path, exist_ok=True)
+            self.page_buffer = PageBuffer(64, self.pages_path)
+
+    def create_table(self, name, num_columns, key_index):
+        """Create a new table"""
+        self._ensure_initialized()  # Make sure page_buffer exists
+        table = Table(name, num_columns, key_index, self)
+        self.tables[name] = table
+        return table
 
 
     @property
@@ -108,12 +127,6 @@ class Database():
                     if table_name in self.tables:
                         page = Page(page_id, path=self.pages_path)
                         self.tables[table_name].pageDirectory[page_id] = page
-
-    def create_table(self, name, num_columns, key_index):
-        """Create a new table"""
-        table = Table(name, num_columns, key_index, self)
-        self.tables[name] = table
-        return table
 
     def drop_table(self, name):
         """Delete table"""
