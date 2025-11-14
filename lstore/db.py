@@ -33,6 +33,10 @@ class Database():
         self.openTables = []
         self.numPagesInMemory = 0
 
+        self.page_buffer = PageBuffer(capacity=64, pages_path="./pages")  # Default buffer
+        self.path = "./"  # Default path
+
+
     @property
     def pages_path(self):
         """Path to pages directory"""
@@ -118,3 +122,97 @@ class Database():
     def get_table(self, name):
         """Get table by name"""
         return self.tables[name]
+
+
+def test_persistence():
+    """Test persistence - exact match to exam format"""
+    import os
+    import shutil
+    from random import randint, seed
+
+    test_dir = './tmp/persistence_test'
+    if os.path.exists(test_dir):
+        shutil.rmtree(test_dir)
+    os.makedirs(test_dir)
+
+    seed(3562901)
+
+    # ===== PART 1: Create, Insert, Update, Save (EXACT EXAM FORMAT) =====
+    print("\n=== PART 1: Creating Database ===")
+    db = Database()
+    db.open(test_dir)
+
+    from lstore.query import Query
+    grades_table = db.create_table('Grades', 5, 0)
+    query = Query(grades_table)
+
+    records = {}
+    number_of_records = 1000
+    number_of_updates = 10
+
+    # Insert
+    for i in range(0, number_of_records):
+        key = 92106429 + i
+        records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
+        query.insert(*records[key])
+
+    keys = sorted(list(records.keys()))
+    print("Insert finished")
+
+    # x update on every column (EXACT EXAM FORMAT)
+    for _ in range(number_of_updates):
+        for key in keys:
+            updated_columns = [None, None, None, None, None]
+            for i in range(2, grades_table.num_columns):
+                # updated value
+                value = randint(0, 20)
+                updated_columns[i] = value
+                # update our test directory
+                records[key][i] = value
+                query.update(key, *updated_columns)
+                updated_columns[i] = None
+
+    print("Update finished")
+
+    # Close
+    db.close()
+    print("Database closed")
+
+    # ===== PART 2: Load and Verify (EXACT EXAM FORMAT) =====
+    print("\n=== PART 2: Loading and Verifying ===")
+
+    db = Database()
+    db.open(test_dir)
+
+    grades_table = db.get_table('Grades')
+    query = Query(grades_table)
+
+    # Check records that were persisted (EXACT EXAM FORMAT - print object not columns)
+    errors = 0
+    for key in keys:
+        record = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)[0]
+        error = False
+        for i, column in enumerate(record.columns):
+            if column != records[key][i]:
+                error = True
+        if error:
+            errors += 1
+            if errors <= 20:
+                print('select error on', key, ':', record, ', correct:', records[key])  # Print object like exam
+
+    if errors > 20:
+        print(f"... and {errors - 20} more errors")
+
+    print(f"Select for version -1 finished: {errors} errors")
+
+    if errors == 0:
+        print("\n✓✓✓ TEST PASSED ✓✓✓")
+    else:
+        print(f"\n✗✗✗ TEST FAILED ✗✗✗")
+
+    # Cleanup
+    shutil.rmtree(test_dir)
+
+
+if __name__ == "__main__":
+    test_persistence()

@@ -16,18 +16,6 @@ TIMESTAMP_COLUMN = 2
 SCHEMA_ENCODING_COLUMN = 3
 
 
-def _rid_to_str(rid):
-    """
-    Convert RID tuple to string.
-
-    Args:
-        rid: Tuple like (('users-P-0-1', 100), ('users-P-1-1', 200), ...)
-
-    Returns:
-        String like "users-P-0-1:100,users-P-1-1:200,..."
-    """
-    return ",".join([f"{pid}:{loc}" for pid, loc in rid])
-
 
 class Record:
 
@@ -118,12 +106,6 @@ class Table:
         self.pageDirectory = {}
         self.parentDatabase = parentDatabase
 
-        # CREATE INITIAL PAGES WITH TABLE PREFIX
-        for i in range(self.numColumns):
-            PID = f"{self.tableName}-P-{i}-0"  # ← CHANGED: Added table name prefix
-            self.pageDirectory[PID] = Page(PID)
-            self.pageRange.append(PID)
-            self.availablePages[i].append(PID)
     @property
     def metadata(self):
         """Return table metadata as dict"""
@@ -136,56 +118,95 @@ class Table:
     def insert(self, *columns):
         status = True
         RID = []
+
         for i in range(self.numColumns):
-            # Step-01: check if page is full
-            if (not self.pageDirectory[self.pageRange[i]].hasCapacity()):
+            # Check if we have a page for this column yet
+            if i >= len(self.pageRange) or self.pageRange[i] is None:
+                # Create first page for this column
+                page_id = f"{self.tableName}-P-{i}-0"
+                page = self.parentDatabase.page_buffer.new_page(page_id)
+                self.pageDirectory[page_id] = page
+
+                # Ensure pageRange is big enough
+                while len(self.pageRange) <= i:
+                    self.pageRange.append(None)
+                self.pageRange[i] = page_id
+
+            page_id = self.pageRange[i]
+
+            # Get page through buffer
+            page = self.parentDatabase.page_buffer.request_page(page_id)
+
+            # Check if page is full
+            if not page.hasCapacity():
                 # Extract page number and increment
-                pNum = int(self.pageRange[i].split('-')[-1]) + 1  # ← CHANGED: split by last '-'
+                pNum = int(page_id.split('-')[-1]) + 1
 
                 # Create new PID with table prefix
-                newPID = f"{self.tableName}-P-{i}-{pNum}"  # ← CHANGED: Added table name prefix
-                self.pageDirectory[newPID] = Page(newPID)
-                self.pageRange[i] = newPID
+                new_page_id = f"{self.tableName}-P-{i}-{pNum}"
 
-            # Step-02: Insert and generate RID
-            RID.append((self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])))
+                # Create new page through buffer
+                page = self.parentDatabase.page_buffer.new_page(new_page_id)
+
+                # Register with table
+                self.pageDirectory[new_page_id] = page
+                self.pageRange[i] = new_page_id
+
+            # Write to page
+            offset = page.write(columns[i])
+            page.isdirty = True
+            RID.append((self.pageRange[i], offset))
 
         RID = tuple(RID)
         self.recordDirectory[RID] = [RID]
 
-        # Step-03: Update index
+        # Update index
         for i in range(self.numColumns):
             self.index.add_to_index(i, columns[i], RID)
 
         return status
- 
+
 
     def delete(self, primaryKey):
-        RID = self.index.locate(0, primaryKey)[0] #only base record rids are stored in index.
-        #open up the spots in the pages
+        RID = self.index.locate(0, primaryKey)[0]
         self.recordDirectory[RID] = -1
 
     def update(self, primaryKey, *columns):
         baseRID = self.index.locate(0, primaryKey)[0]
-        if (len(baseRID) == 0):
+        if len(baseRID) == 0:
             return False
 
+        # Get the last version
         RID = self.recordDirectory[baseRID][-1]
         tRID = []
 
+        # Create tail record
         for i in range(self.numColumns):
-            # Check if page is full
-            if (not self.pageDirectory[self.pageRange[i]].hasCapacity()):
-                pNum = int(self.pageRange[i].split('-')[-1]) + 1  # ← CHANGED
-                newPID = f"{self.tableName}-P-{i}-{pNum}"  # ← CHANGED: Added table name prefix
-                self.pageDirectory[newPID] = Page(newPID)
-                self.pageRange[i] = newPID
+            page_id = self.pageRange[i]
 
-            # Insert record data
-            if (columns[i] is None):
+            # Get page through buffer
+            page = self.parentDatabase.page_buffer.request_page(page_id)
+
+            # Check if page is full
+            if not page.hasCapacity():
+                pNum = int(page_id.split('-')[-1]) + 1
+                new_page_id = f"{self.tableName}-P-{i}-{pNum}"
+
+                # Create new page through buffer
+                page = self.parentDatabase.page_buffer.new_page(new_page_id)
+
+                # Register with table
+                self.pageDirectory[new_page_id] = page
+                self.pageRange[i] = new_page_id
+                page_id = new_page_id  # ← UPDATE page_id to use new page
+
+            # Write to page
+            if columns[i] is None:
                 tRID.append(RID[i])
             else:
-                tRID.append((self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])))
+                offset = page.write(columns[i])
+                page.isdirty = True
+                tRID.append((page_id, offset))  # ← Use page_id (not self.pageRange[i] in case it changed)
 
         self.recordDirectory[baseRID].append(tuple(tRID))
         return True
@@ -194,31 +215,30 @@ class Table:
         """
         Description: This method retrieves an item from the table
         """
-        #step-01: lookup the record
         data = []
-        if(RID in self.recordDirectory):
-            if(version == 0 and self.recordDirectory[RID] != -1):
-                #looking up the base record
-                data = [self.pageDirectory[loc[0]].read(loc[1]) for loc in RID]
-                if(len(columns) == 0):
+        if (RID in self.recordDirectory):
+            if (version == 0 and self.recordDirectory[RID] != -1):
+                # Looking up the base record
+                data = [self.parentDatabase.page_buffer.request_page(loc[0]).read(loc[1]) for loc in RID]
+                if (len(columns) == 0):
                     return Record(RID, data[self.primaryKey], data)
                 else:
                     data = [data[i] for i in range(len(columns)) if columns[i] == 1]
-            elif(version != 0 and self.recordDirectory[RID] != -1):
-                #lookup the version in record dir
+            elif (version != 0 and self.recordDirectory[RID] != -1):
+                # Lookup the version in record dir
                 tRID = self.recordDirectory[RID][version]
-                data = [self.pageDirectory[loc[0]].read(loc[1]) for loc in tRID]
-                if(len(columns) == 0):
+                data = [self.parentDatabase.page_buffer.request_page(loc[0]).read(loc[1]) for loc in tRID]
+                if (len(columns) == 0):
                     return Record(tRID, data[self.primaryKey], data)
                 else:
                     data = [data[i] for i in range(len(columns)) if columns[i] == 1]
             else:
                 return False
         else:
-                return False
+            return False
 
     def save(self, db_path):
-        """Write table metadata and record directory to disk"""
+        """Write table metadata, record directory, and indexes to disk"""
         # Write metadata
         with open(f"{db_path}/{self.tableName}.meta", "w") as f:
             f.write(f"{self.tableName},{self.numColumns},{self.primaryKey}\n")
@@ -234,6 +254,10 @@ class Table:
                     rid_strs = [Record.rid_to_string(rid) for rid in tail_rids]
                     f.write("|".join(rid_strs) + "\n")
 
+        # Save indexes for all columns
+        index_path = f"{db_path}/{self.tableName}.index"
+        self.index.save_tree(index_path)
+
     @staticmethod
     def open(table_name, db_path, parent_database):
         """Load table from disk"""
@@ -246,6 +270,10 @@ class Table:
 
         # Create table
         table = Table(name, num_columns, primary_key, parent_database)
+
+        # CLEAR default pages created by __init__
+        table.pageDirectory.clear()
+        table.pageRange = []
 
         # Read record directory
         with open(f"{db_path}/{table_name}.records", "r") as f:
@@ -267,6 +295,11 @@ class Table:
                     table.recordDirectory[base_rid] = tail_rids
                 else:
                     table.recordDirectory[base_rid] = [base_rid]
+
+        # Load indexes for all columns
+        index_path = f"{db_path}/{table_name}.index"
+        for col in range(num_columns):
+            table.index.load_tree(col, index_path)
 
         return table
 
