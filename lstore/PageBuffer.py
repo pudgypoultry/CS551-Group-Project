@@ -84,3 +84,57 @@ class PageBuffer():
         self.buffer.append(page)
         self.page_ids.append(page_id)
 
+
+def test_page_buffer():
+    """Minimal PageBuffer test"""
+    import os
+    #TODO dont use shutils
+    import shutil
+
+    # Setup
+    test_dir = './tmp/buffer_test'
+    if os.path.exists(test_dir):
+        shutil.rmtree(test_dir)
+    os.makedirs(f"{test_dir}/pages")
+
+    buffer = PageBuffer(capacity=3, pages_path=f"{test_dir}/pages")
+
+    # Test 1: Add 3 pages (fills buffer)
+    p1 = buffer.new_page("T-P-0-0")
+    p2 = buffer.new_page("T-P-0-1")
+    p3 = buffer.new_page("T-P-0-2")
+    assert len(buffer.buffer) == 3
+    print("✓ Buffer full (3 pages)")
+
+    # Test 2: Add 4th page (evicts oldest)
+    p4 = buffer.new_page("T-P-0-3")
+    assert len(buffer.buffer) == 3
+    assert "T-P-0-0" not in buffer.page_ids
+    print("✓ Eviction works")
+
+    # Test 3: Request existing page (cache hit)
+    same = buffer.request_page("T-P-0-1")
+    assert same is p2
+    print("✓ Cache hit works")
+
+    # Test 4: Flush and reload
+    p2.write(100)
+    p2.isdirty = True
+    buffer.flush_all()
+
+    buffer.buffer = []
+    buffer.page_ids = []
+
+    loaded = buffer.request_page("T-P-0-1")
+    assert loaded.read(0) == 100
+    print("✓ Load from disk works")
+
+    # Cleanup
+    shutil.rmtree(test_dir)
+    print("✓ All tests passed")
+
+
+if __name__ == "__main__":
+    from lstore.db import PageBuffer
+
+    test_page_buffer()
