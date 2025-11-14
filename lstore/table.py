@@ -50,7 +50,7 @@ class Table:
         Notes:
         1. 
         """
-    def __init__(self, tableName='Default', numColumns=4, primaryKey=0):
+    def __init__(self, tableName='Default', numColumns=4, primaryKey=0, parentDatabase=None):
         """
         Description: The constructor for the table object. Builds an preprovisions the table.
         Inputs:
@@ -82,7 +82,8 @@ class Table:
         self.availablePages = [[] for x in range(self.numColumns)] # a 2d array with an inner array for each column. Pages with available space go here.
         self.index = Index(self)
         self.recordDirectory = {}
-        self.pageDirectory = {} 
+        self.pageDirectory = {}
+        self.parentDatabase = parentDatabase
         for i in range(self.numColumns): #create the initial set of pages.
             PID = f"P-{i}-0"
             self.pageDirectory[PID] = Page(PID)
