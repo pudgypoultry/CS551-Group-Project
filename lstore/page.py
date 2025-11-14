@@ -13,7 +13,7 @@ Description:
 
 class Page:
 
-    def __init__(self, pid, capacity=4096, size=8):
+    def __init__(self, pid, capacity=4096, size=8, path="storage"):
         """
         Description: The physical page of our columnar storage. A page contains a single column of data.
         Inputs:
@@ -41,6 +41,8 @@ class Page:
         self.entrySize = size
         self.data = bytearray(1)
         self.availableOffsets = []
+        self.isdirty = True
+        self.path = path
 
         if (type(pid) != type("str") or "P-" not in pid):
             err = "ERROR: Parameter <pid> must be a string in the format P-<int>."
@@ -80,6 +82,7 @@ class Page:
         data = str(value).ljust(8, '=').encode('utf-8')
         self.data[index: (index + 8)] = data
         self.numRecords += 1
+        self.isdirty = True
         return index
 
     def read(self, index):
@@ -100,3 +103,61 @@ class Page:
         """
         self.availableOffsets.append(index)
         self.numRecords -= 1
+
+    def save(self):
+        """
+        Description: Saves the page and all of it's data to text file.
+        Inputs: N/A
+        Text file format:
+
+        <pageID>.data
+        item desc           Format
+        numRecords (int):           "<int>"\n
+        capacity (int):             "<int>"\n
+        entrySize (int):            "<int>"\n
+        maxEntries (int):           "<int>"\n
+        availableOffsets (CS-List): "idx_1,idx_2,...,idx_n"\n
+
+        <pageID>.bin
+        data (ByteArray): The actual data of the column in bytes
+        """
+        status = True
+        try:
+            with open(f"{self.path}/{self.pageID}.data", "w") as outfile:
+                outfile.write(str(self.numRecords))
+                outfile.write(str(self.capacity))
+                outfile.write(str(self.entrySize))
+                outfile.write(str(self.maxEntries))
+                outfile.write(",".join(map(str, self.availableOffsets)))
+
+            with open(f"{self.path}/{self.pageID}.bin", "wb") as outfile:
+                outfile.write(bytes(self.data))
+            
+            self.isdirty = False
+        except Exception as e:
+            status = False
+            print(f"Page load error: {e}")
+
+    def load(self):
+        status = True
+        try:
+            with open(f"{self.path}/{self.pageID}.data", "r") as infile:
+                self.numRecords =  int(infile.readline().strip())
+                self.capacity = int(infile.readline().strip())
+                self.entrySize = int(infile.readline().strip())
+                self.maxEntries = int(infile.readline().strip())
+                self.availableOffsets = list(map(int, infile.readline().split(",")))
+            
+            with open(f"{self.path}/{self.pageID}.bin", "rb") as infile:
+                self.data = bytearray(infile.read())
+        
+            self.isdirty = False
+        except Exception as e:
+            print(f"Page load() Error: {e}")
+            status = False
+        return status
+
+    def isDirty(self):
+        return self.isdirty
+
+    

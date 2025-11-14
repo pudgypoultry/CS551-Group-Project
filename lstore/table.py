@@ -89,14 +89,6 @@ class Table:
             self.pageRange.append(PID)
             self.availablePages[i].append(PID)
 
-    def _updatePages(self, col):
-        print("Making new pages")
-        if(self.pageDirectory[self.pageRange[col]].hasCapacity() == False):
-            pNum = int(self.pageRange[col].split('-')[2])+1
-            self.pageDirectory[f"P-{col}-{pNum}"] = Page(f"P-{col}-{pNum}")
-            self.pageRange[col] = f"P-{col}-{pNum}"
-            #self.availablePages[col].remove(f"P-{col}-{pNum-1}")
-
     def insert(self, *columns):
         """
         Description: Table.insert(values) inserts the new record into the table and updates the page directory.
@@ -130,6 +122,7 @@ class Table:
 
     def delete(self, primaryKey):
         RID = self.index.locate(0, primaryKey)[0] #only base record rids are stored in index.
+        #open up the spots in the pages
         self.recordDirectory[RID] = -1
 
     def update(self, primaryKey, *columns):
@@ -161,7 +154,7 @@ class Table:
         self.recordDirectory[baseRID].append(tuple(tRID))
         return True
 
-    def fetch(self, RID, version=-1):
+    def fetch(self, RID, version=-1, columns=[]):
         """
         Description: This method retrieves an item from the table
         """
@@ -171,15 +164,27 @@ class Table:
             if(version == 0 and self.recordDirectory[RID] != -1):
                 #looking up the base record
                 data = [self.pageDirectory[loc[0]].read(loc[1]) for loc in RID]
-                return Record(RID, data[self.primaryKey], data)
+                if(len(columns) == 0):
+                    return Record(RID, data[self.primaryKey], data)
+                else:
+                    data = [data[i] for i in range(len(columns)) if columns[i] == 1]
             elif(version != 0 and self.recordDirectory[RID] != -1):
                 #lookup the version in record dir
                 tRID = self.recordDirectory[RID][version]
                 data = [self.pageDirectory[loc[0]].read(loc[1]) for loc in tRID]
-                return Record(RID, data[self.primaryKey], data)
+                if(len(columns) == 0):
+                    return Record(tRID, data[self.primaryKey], data)
+                else:
+                    data = [data[i] for i in range(len(columns)) if columns[i] == 1]
             else:
                 return False
         else:
                 return False
+        
+    def merge(self):
+        """
+        Description: Simple merge since we use cumulative updates.
+        """
+        pass
 
             
