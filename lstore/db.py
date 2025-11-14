@@ -27,6 +27,7 @@ class Database():
         Ultimately, we'll replace column/pagenumber (the first item of each entry in bufferpool) with the page itself
         """
         self.bufferPool = []
+        self.bufferPoolPIDs = []
         self.currentTable = None
         self.openTables = []
         self.numPagesInMemory = 0
@@ -67,26 +68,27 @@ class Database():
     def get_table(self, name):
         return self.tables[name]
 
+
     """
     TODO: Grab reference to page needed and open it here, can replace column/pagenumber with the page itself
     """
 
-    def open_page(self, column, pageNumber):
-        if (column, pageNumber) in self.bufferPool:
-            i = self.bufferPool.index((column, pageNumber))
+    def open_page(self, pageObject):
+        if pageObject in self.bufferPool:
+            i = self.bufferPool.index(pageObject)
             currentPage = self.bufferPool.pop(i)
             self.bufferPool.append(currentPage)
         else:
-            self.add_to_bufferpool(column, pageNumber)
+            self.add_to_bufferpool(pageObject)
 
     """
     Add the page to the bufferpool, make sure to boot out oldest page before adding new one if too many are stored
     """
 
-    def add_to_bufferpool(self, column, pageNumber):
+    def add_to_bufferpool(self, pageObject):
         if len(self.bufferPool) < self.numPagesInMemory:
-            self.bufferPool.append((column, pageNumber))
+            self.bufferPool.append(pageObject)
         else:
             self.bufferPool.pop(0)
-            # TODO: Check whether self.bufferPool[0][1] is True, if so need to deal with dirty page
-            self.bufferPool.append((column, pageNumber))
+            #TODO: call whatever needs done for dirty pages to write to disk
+            self.bufferPool.append(pageObject)
