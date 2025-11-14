@@ -192,7 +192,7 @@ def demo():
             self.numColumns = num_cols
 
     mock_table = MockTable(num_cols=3)
-    test_file_path = "./test_index_file"
+    test_file_path = "./tmp/test_index_file"
 
     # 2. Create an Index and add data
     print("Creating original index and adding data...")

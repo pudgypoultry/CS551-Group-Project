@@ -1,5 +1,4 @@
 from lstore.table import Table
-from lstore.PageBuffer import PageBuffer
 import os
 
 class Database():
