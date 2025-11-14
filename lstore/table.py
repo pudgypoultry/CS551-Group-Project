@@ -43,6 +43,26 @@ class Record:
         self.key = key
         self.columns = columns
 
+    @staticmethod
+    def rid_to_string(rid):
+        """
+        Convert RID tuple to string.
+        RID: (('users-P-0-1', 100), ('users-P-1-1', 200), ...)
+        String: "users-P-0-1:100,users-P-1-1:200,..."
+        """
+        return ",".join([f"{pid}:{loc}" for pid, loc in rid])
+
+    @staticmethod
+    def string_to_rid(rid_str):
+        """
+        Convert string back to RID tuple.
+        String: "users-P-0-1:100,users-P-1-1:200,..."
+        RID: (('users-P-0-1', 100), ('users-P-1-1', 200), ...)
+        """
+        parts = rid_str.split(',')
+        return tuple(tuple([p.split(':')[0], int(p.split(':')[1])]) for p in parts)
+
+
 class Table:
     """
         Description: Our table implementation for the lstore database.
@@ -104,6 +124,14 @@ class Table:
             self.pageDirectory[PID] = Page(PID)
             self.pageRange.append(PID)
             self.availablePages[i].append(PID)
+    @property
+    def metadata(self):
+        """Return table metadata as dict"""
+        return {
+            'name': self.tableName,
+            'num_columns': self.numColumns,
+            'primary_key': self.primaryKey
+        }
 
     def insert(self, *columns):
         status = True
@@ -189,41 +217,58 @@ class Table:
         else:
                 return False
 
-    def save_table(self, db_path):
-        """
-        Save table metadata to disk. Pages identified by table name prefix in PID.
+    def save(self, db_path):
+        """Write table metadata and record directory to disk"""
+        # Write metadata
+        with open(f"{db_path}/{self.tableName}.meta", "w") as f:
+            f.write(f"{self.tableName},{self.numColumns},{self.primaryKey}\n")
 
-        Args:
-            db_path: Path to database directory (passed from Database.close())
+        # Write record directory
+        with open(f"{db_path}/{self.tableName}.records", "w") as f:
+            f.write(str(len(self.recordDirectory)) + '\n')
 
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            print(f"[TABLE] Saving {self.tableName} to disk")
+            for base_rid, tail_rids in self.recordDirectory.items():
+                if tail_rids == -1:
+                    f.write(f"{Record.rid_to_string(base_rid)}|-1\n")
+                else:
+                    rid_strs = [Record.rid_to_string(rid) for rid in tail_rids]
+                    f.write("|".join(rid_strs) + "\n")
 
-            # Save table metadata
-            with open(f"{db_path}/{self.tableName}.meta", "w") as outfile:
-                # Line 1: Basic table info
-                outfile.write(f"{self.tableName},{self.numColumns},{self.primaryKey}\n")
+    @staticmethod
+    def open(table_name, db_path, parent_database):
+        """Load table from disk"""
+        # Read metadata
+        with open(f"{db_path}/{table_name}.meta", "r") as f:
+            line = f.readline().strip().split(',')
+            name = line[0]
+            num_columns = int(line[1])
+            primary_key = int(line[2])
 
-            # Save all pages that this table has access to
-            pages_saved = 0
-            for page_id, page in self.pageDirectory.items():
-                # Set page path to central pages directory
-                page.path = f"{db_path}/pages"
-                # Save the page
-                page.save()
-                pages_saved += 1
+        # Create table
+        table = Table(name, num_columns, primary_key, parent_database)
 
-            print(f"Table '{self.tableName}' metadata saved successfully")
-            print(f"Saved {pages_saved} pages to disk")
-            return True
+        # Read record directory
+        with open(f"{db_path}/{table_name}.records", "r") as f:
+            num_records = int(f.readline().strip())
 
-        except Exception as e:
-            print(f"Table save_table error: {e}")
-            return False
+            for _ in range(num_records):
+                rid_line = f.readline().strip()
+                parts = rid_line.split('|')
 
+                if not parts or not parts[0]:
+                    continue
+
+                base_rid = Record.string_to_rid(parts[0])
+
+                if len(parts) > 1 and parts[1] == '-1':
+                    table.recordDirectory[base_rid] = -1
+                elif len(parts) > 1:
+                    tail_rids = [Record.string_to_rid(rid_str) for rid_str in parts]
+                    table.recordDirectory[base_rid] = tail_rids
+                else:
+                    table.recordDirectory[base_rid] = [base_rid]
+
+        return table
 
     def merge(self):
         """
