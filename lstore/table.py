@@ -16,6 +16,19 @@ TIMESTAMP_COLUMN = 2
 SCHEMA_ENCODING_COLUMN = 3
 
 
+def _rid_to_str(rid):
+    """
+    Convert RID tuple to string.
+
+    Args:
+        rid: Tuple like (('users-P-0-1', 100), ('users-P-1-1', 200), ...)
+
+    Returns:
+        String like "users-P-0-1:100,users-P-1-1:200,..."
+    """
+    return ",".join([f"{pid}:{loc}" for pid, loc in rid])
+
+
 class Record:
 
     def __init__(self, rid, key, columns):
@@ -78,46 +91,44 @@ class Table:
         self.primaryKey = primaryKey
         self.numColumns = numColumns
         self.num_columns = self.numColumns
-        self.pageRange = [] #pages that we are activly using go here.
-        self.availablePages = [[] for x in range(self.numColumns)] # a 2d array with an inner array for each column. Pages with available space go here.
+        self.pageRange = []
+        self.availablePages = [[] for x in range(self.numColumns)]
         self.index = Index(self)
         self.recordDirectory = {}
         self.pageDirectory = {}
         self.parentDatabase = parentDatabase
-        for i in range(self.numColumns): #create the initial set of pages.
-            PID = f"P-{i}-0"
+
+        # CREATE INITIAL PAGES WITH TABLE PREFIX
+        for i in range(self.numColumns):
+            PID = f"{self.tableName}-P-{i}-0"  # ← CHANGED: Added table name prefix
             self.pageDirectory[PID] = Page(PID)
             self.pageRange.append(PID)
             self.availablePages[i].append(PID)
 
     def insert(self, *columns):
-        """
-        Description: Table.insert(values) inserts the new record into the table and updates the page directory.
-        Inputs: 
-            columns (list): A list of data for this record. Format: [<data0>, ..., ,<DataN>]
-
-        outputs:
-        rid (str): rid of the new record. Format: [(PID, loc), ..., ()]
-        """
         status = True
         RID = []
         for i in range(self.numColumns):
-            #Step-01: check if page is full
-            if(not self.pageDirectory[self.pageRange[i]].hasCapacity()):
-                #... if it is then make a new page.
-                pNum = int(self.pageRange[i].split('-')[2])+1
-                self.pageDirectory[f"P-{i}-{pNum}"] = Page(f"P-{i}-{pNum}")
-                self.pageRange[i] = f"P-{i}-{pNum}"
-            
-            #Step-02: Insert record data into the physical pages and generate it's RID.
+            # Step-01: check if page is full
+            if (not self.pageDirectory[self.pageRange[i]].hasCapacity()):
+                # Extract page number and increment
+                pNum = int(self.pageRange[i].split('-')[-1]) + 1  # ← CHANGED: split by last '-'
+
+                # Create new PID with table prefix
+                newPID = f"{self.tableName}-P-{i}-{pNum}"  # ← CHANGED: Added table name prefix
+                self.pageDirectory[newPID] = Page(newPID)
+                self.pageRange[i] = newPID
+
+            # Step-02: Insert and generate RID
             RID.append((self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])))
+
         RID = tuple(RID)
         self.recordDirectory[RID] = [RID]
-        
-        #Step-03: Update the index
+
+        # Step-03: Update index
         for i in range(self.numColumns):
             self.index.add_to_index(i, columns[i], RID)
-        #Step-04: Output true if the insert was successful or False if it was not.
+
         return status
  
 
@@ -127,27 +138,23 @@ class Table:
         self.recordDirectory[RID] = -1
 
     def update(self, primaryKey, *columns):
-        # Step-01: Find the RID of the record to be updated.
-        baseRID = self.index.locate(0, primaryKey)[0] #only base record rids are stored in index.
-        if(len(baseRID) == 0):
+        baseRID = self.index.locate(0, primaryKey)[0]
+        if (len(baseRID) == 0):
             return False
 
-        # Step-02: Get the last version
         RID = self.recordDirectory[baseRID][-1]
-
-
         tRID = []
-        #step-02: Create tail record by appending new value to physical pages
+
         for i in range(self.numColumns):
-            #Step-01: check if page is full
-            if(not self.pageDirectory[self.pageRange[i]].hasCapacity()):
-                #... if it is then make a new page.
-                pNum = int(self.pageRange[i].split('-')[2])+1
-                self.pageDirectory[f"P-{i}-{pNum}"] = Page(f"P-{i}-{pNum}")
-                self.pageRange[i] = f"P-{i}-{pNum}"
-        
-            #Step-02: Insert record data into the physical pages and generate it's RID.
-            if(columns[i] is None):
+            # Check if page is full
+            if (not self.pageDirectory[self.pageRange[i]].hasCapacity()):
+                pNum = int(self.pageRange[i].split('-')[-1]) + 1  # ← CHANGED
+                newPID = f"{self.tableName}-P-{i}-{pNum}"  # ← CHANGED: Added table name prefix
+                self.pageDirectory[newPID] = Page(newPID)
+                self.pageRange[i] = newPID
+
+            # Insert record data
+            if (columns[i] is None):
                 tRID.append(RID[i])
             else:
                 tRID.append((self.pageRange[i], self.pageDirectory[self.pageRange[i]].write(columns[i])))
@@ -181,11 +188,46 @@ class Table:
                 return False
         else:
                 return False
-        
+
+    def save_table(self, db_path):
+        """
+        Save table metadata to disk. Pages identified by table name prefix in PID.
+
+        Args:
+            db_path: Path to database directory (passed from Database.close())
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            print(f"[TABLE] Saving {self.tableName} to disk")
+
+            # Save table metadata
+            with open(f"{db_path}/{self.tableName}.meta", "w") as outfile:
+                # Line 1: Basic table info
+                outfile.write(f"{self.tableName},{self.numColumns},{self.primaryKey}\n")
+
+            # Save all pages that this table has access to
+            pages_saved = 0
+            for page_id, page in self.pageDirectory.items():
+                # Set page path to central pages directory
+                page.path = f"{db_path}/pages"
+                # Save the page
+                page.save()
+                pages_saved += 1
+
+            print(f"Table '{self.tableName}' metadata saved successfully")
+            print(f"Saved {pages_saved} pages to disk")
+            return True
+
+        except Exception as e:
+            print(f"Table save_table error: {e}")
+            return False
+
+
     def merge(self):
         """
         Description: Simple merge since we use cumulative updates.
         """
         pass
 
-            
