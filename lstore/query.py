@@ -80,29 +80,26 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
+
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
         records = []
         RIDs = self.table.index.locate(search_key_index, search_key)
         for rid in RIDs:
-            # This if/else checks if relative_version is out of range => return base record
+            # Check if relative_version is out of range => return base record
             if len(self.table.recordDirectory[rid]) <= abs(relative_version):
                 # Case 1: return the base record
                 rVersion = 0
             else:
                 # Case 2: return a tail record
-                rVersion = relative_version-1
-                
-            record = self.table.fetch(rid, rVersion) 
+                rVersion = relative_version  # ← REMOVE THE -1
 
-            # FIXME: This process of only selecting the desired columns WILL be optimized so as to capitalize on columnar approach
+            record = self.table.fetch(rid, rVersion)
+
             new_columns = []
             for i in range(self.table.numColumns):
                 if projected_columns_index[i] == 1:
                     new_columns.append(record.columns[i])
 
-            # has_key = projected_columns_index[self.table.primaryKey] == 1
-            # new_record_key = record.key if has_key else None
-            # FIXME: The primary key is set to be the original primary key, even though the shortened record may not contain it.
             new_record = Record(rid, record.key, new_columns)
             records.append(new_record)
         return records

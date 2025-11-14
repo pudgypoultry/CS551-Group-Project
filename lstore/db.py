@@ -1,8 +1,9 @@
 from lstore.table import Table
+from lstore.PageBuffer import PageBuffer
+import os
 
 
 class Database():
-
     def __init__(self):
         self.tables = {}
         """
@@ -32,75 +33,186 @@ class Database():
         self.openTables = []
         self.numPagesInMemory = 0
 
-    # Not required for milestone1
+        self.page_buffer = PageBuffer(capacity=64, pages_path="./pages")  # Default buffer
+        self.path = "./"  # Default path
+
+
+    @property
+    def pages_path(self):
+        """Path to pages directory"""
+        return f"{self.path}/pages"
+
+    @property
+    def meta_path(self):
+        """Path to database metadata file"""
+        return f"{self.path}/database.meta"
+
     def open(self, path, numPagesInMemory=64):
-        self.currentTable = open(path, "w+")
-        self.openTables.append(self.currentTable)
-        self.numPagesInMemory = numPagesInMemory
+        """Open existing database or create new one"""
+        self.path = path
+
+        os.makedirs(path, exist_ok=True)
+        os.makedirs(self.pages_path, exist_ok=True)
+
+        # Initialize page buffer
+        self.page_buffer = PageBuffer(numPagesInMemory, self.pages_path)
+
+        # Load database metadata if it exists
+        if os.path.exists(self.meta_path):
+            self._load()
+
+        print(f"Database opened at: {path}")
 
     def close(self):
-        for table in self.openTables:
-            table.close()
+        """Close database"""
+        self._save()
+        print(f"Database closed")
 
-    """
-    # Creates a new table
-    :param name: string         #Table name
-    :param num_columns: int     #Number of Columns: all columns are integer
-    :param key: int             #Index of table key in columns
-    """
+    def _save(self):
+        """Save database metadata and all tables"""
+        # Flush all dirty pages
+        self.page_buffer.flush_all()
+
+        # Save database metadata
+        with open(self.meta_path, "w") as f:
+            f.write(str(self.page_buffer.capacity) + '\n')
+            f.write(str(len(self.tables)) + '\n')
+            f.write(",".join(self.tables.keys()) + '\n')
+
+        # Save each table
+        for table in self.tables.values():
+            table.save(self.path)
+
+    def _load(self):
+        """Load database metadata and all tables"""
+        from lstore.page import Page
+
+        # Load database metadata
+        with open(self.meta_path, "r") as f:
+            f.readline()  # Skip capacity
+            num_tables = int(f.readline().strip())
+            table_names = f.readline().strip().split(',')
+
+        # Load each table
+        for table_name in table_names:
+            table = Table.open(table_name, self.path, self)
+            self.tables[table_name] = table
+
+        # Discover pages
+        if os.path.exists(self.pages_path):
+            for filename in os.listdir(self.pages_path):
+                if filename.endswith('.data'):
+                    page_id = filename[:-5]
+                    table_name = page_id.split('-P-')[0]
+
+                    if table_name in self.tables:
+                        page = Page(page_id, path=self.pages_path)
+                        self.tables[table_name].pageDirectory[page_id] = page
 
     def create_table(self, name, num_columns, key_index):
-        # To-Do: create a table, create indices, make all pages, add them to the bufferpool memory objects
-        # table makes its own indices and pages upon creation
+        """Create a new table"""
         table = Table(name, num_columns, key_index, self)
         self.tables[name] = table
-        for i in range(num_columns):
-            self.bufferPool.append((i,1))
-            # self.bufferPool.append() # Append the actual page? Or the tuple as specified?
         return table
 
-    """
-    # Deletes the specified table
-    """
-
     def drop_table(self, name):
-        for pid in self.tables[name].pageDirectory.keys():
-            # access each page in pageDirectory
-            # FIXME: how to actually delete the page out of the text file?
-            del self.tables[name].pageDirectory[pid]
-        # delete all pages linked to table
-        # delete all page references in table
-        # delete table
+        """Delete table"""
         del self.tables[name]
 
-    """
-    # Returns table with the passed name
-    """
-
     def get_table(self, name):
+        """Get table by name"""
         return self.tables[name]
 
 
-    """
-    TODO: Grab reference to page needed and open it here, can replace column/pagenumber with the page itself
-    """
+def test_persistence():
+    """Test persistence - exact match to exam format"""
+    import os
+    import shutil
+    from random import randint, seed
 
-    def open_page(self, pageObject):
-        if pageObject in self.bufferPool:
-            i = self.bufferPool.index(pageObject)
-            currentPage = self.bufferPool.pop(i)
-            self.bufferPool.append(currentPage)
-        else:
-            self.add_to_bufferpool(pageObject)
+    test_dir = './tmp/persistence_test'
+    if os.path.exists(test_dir):
+        shutil.rmtree(test_dir)
+    os.makedirs(test_dir)
 
-    """
-    Add the page to the bufferpool, make sure to boot out oldest page before adding new one if too many are stored
-    """
+    seed(3562901)
 
-    def add_to_bufferpool(self, pageObject):
-        if len(self.bufferPool) < self.numPagesInMemory:
-            self.bufferPool.append(pageObject)
-        else:
-            self.bufferPool.pop(0)
-            #TODO: call whatever needs done for dirty pages to write to disk
-            self.bufferPool.append(pageObject)
+    # ===== PART 1: Create, Insert, Update, Save (EXACT EXAM FORMAT) =====
+    print("\n=== PART 1: Creating Database ===")
+    db = Database()
+    db.open(test_dir)
+
+    from lstore.query import Query
+    grades_table = db.create_table('Grades', 5, 0)
+    query = Query(grades_table)
+
+    records = {}
+    number_of_records = 1000
+    number_of_updates = 10
+
+    # Insert
+    for i in range(0, number_of_records):
+        key = 92106429 + i
+        records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
+        query.insert(*records[key])
+
+    keys = sorted(list(records.keys()))
+    print("Insert finished")
+
+    # x update on every column (EXACT EXAM FORMAT)
+    for _ in range(number_of_updates):
+        for key in keys:
+            updated_columns = [None, None, None, None, None]
+            for i in range(2, grades_table.num_columns):
+                # updated value
+                value = randint(0, 20)
+                updated_columns[i] = value
+                # update our test directory
+                records[key][i] = value
+                query.update(key, *updated_columns)
+                updated_columns[i] = None
+
+    print("Update finished")
+
+    # Close
+    db.close()
+    print("Database closed")
+
+    # ===== PART 2: Load and Verify (EXACT EXAM FORMAT) =====
+    print("\n=== PART 2: Loading and Verifying ===")
+
+    db = Database()
+    db.open(test_dir)
+
+    grades_table = db.get_table('Grades')
+    query = Query(grades_table)
+
+    # Check records that were persisted (EXACT EXAM FORMAT - print object not columns)
+    errors = 0
+    for key in keys:
+        record = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)[0]
+        error = False
+        for i, column in enumerate(record.columns):
+            if column != records[key][i]:
+                error = True
+        if error:
+            errors += 1
+            if errors <= 20:
+                print('select error on', key, ':', record, ', correct:', records[key])  # Print object like exam
+
+    if errors > 20:
+        print(f"... and {errors - 20} more errors")
+
+    print(f"Select for version -1 finished: {errors} errors")
+
+    if errors == 0:
+        print("\n✓✓✓ TEST PASSED ✓✓✓")
+    else:
+        print(f"\n✗✗✗ TEST FAILED ✗✗✗")
+
+    # Cleanup
+    shutil.rmtree(test_dir)
+
+
+if __name__ == "__main__":
+    test_persistence()
