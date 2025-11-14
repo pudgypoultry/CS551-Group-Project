@@ -50,8 +50,7 @@ class Database():
     """
 
     def create_table(self, name, num_columns, key_index):
-        # create a table, create indices, make all pages, add them to the bufferpool memory objects
-
+        # To-Do: create a table, create indices, make all pages, add them to the bufferpool memory objects
         # table makes its own indices and pages upon creation
         table = Table(name, num_columns, key_index, self)
         self.tables[name] = table
