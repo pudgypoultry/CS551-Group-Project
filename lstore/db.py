@@ -12,9 +12,9 @@ class Database():
                 2. Which page of that column is being referenced
                 3. Was this page altered?
             Each member of self.bufferpool will be of the form:
-                [(column number, page number), boolean]
+                (column number, page number)
             For example, if we are accessing column 2, page 3, and the page has not been altered:
-                [(2, 3), False]
+                (2, 3)
 
         LRU policy will be used to manage the buffer pool. This is done by treating self.bufferPool
             as a queue. If current page not in self.bufferPool and len(self.bufferPool) > self.numPagesInMemory, 
@@ -72,8 +72,7 @@ class Database():
     """
 
     def open_page(self, column, pageNumber):
-        pages = [x[0] for x in self.bufferPool]
-        if (column, pageNumber) in pages:
+        if (column, pageNumber) in self.bufferPool:
             i = pages.index((column, pageNumber))
             currentPage = self.bufferPool.pop(i)
             self.bufferPool.append(currentPage)
@@ -86,8 +85,8 @@ class Database():
 
     def add_to_bufferpool(self, column, pageNumber):
         if len(self.bufferPool) < self.numPagesInMemory:
-            self.bufferPool.append([(column, pageNumber), False])
+            self.bufferPool.append((column, pageNumber))
         else:
             self.bufferPool.pop(0)
             # TODO: Check whether self.bufferPool[0][1] is True, if so need to deal with dirty page
-            self.bufferPool.append([(column, pageNumber), False])
+            self.bufferPool.append((column, pageNumber))
