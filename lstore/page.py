@@ -125,10 +125,11 @@ class Page:
         try:
 
             with open(f"{self.path}/{self.pageID}.data", "w") as outfile:
-                outfile.write(str(self.numRecords))
-                outfile.write(str(self.capacity))
-                outfile.write(str(self.entrySize))
-                outfile.write(str(self.maxEntries))
+                outfile.write(str(self.numRecords)+',')
+                outfile.write(str(self.capacity)+',')
+                outfile.write(str(self.entrySize)+',')
+                outfile.write(str(self.maxEntries)+',')
+                outfile.write('\n')
                 outfile.write(",".join(map(str, self.availableOffsets)))
 
             with open(f"{self.path}/{self.pageID}.bin", "wb") as outfile:
@@ -143,17 +144,25 @@ class Page:
     def load(self):
         status = True
         try:
-
             with open(f"{self.path}/{self.pageID}.data", "r") as infile:
-                self.numRecords =  int(infile.readline().strip())
-                self.capacity = int(infile.readline().strip())
-                self.entrySize = int(infile.readline().strip())
-                self.maxEntries = int(infile.readline().strip())
-                self.availableOffsets = list(map(int, infile.readline().split(",")))
-            
+                # First line: numRecords,capacity,entrySize,maxEntries,
+                first_line = infile.readline().strip().rstrip(',')
+                parts = first_line.split(',')
+                self.numRecords = int(parts[0])
+                self.capacity = int(parts[1])
+                self.entrySize = int(parts[2])
+                self.maxEntries = int(parts[3])
+
+                # Second line: availableOffsets
+                offsets_line = infile.readline().strip()
+                if offsets_line:  # Handle empty list case
+                    self.availableOffsets = list(map(int, offsets_line.split(",")))
+                else:
+                    self.availableOffsets = []
+
             with open(f"{self.path}/{self.pageID}.bin", "rb") as infile:
                 self.data = bytearray(infile.read())
-        
+
             self.isdirty = False
         except Exception as e:
             print(f"Page load() Error: {e}")
@@ -172,4 +181,5 @@ if __name__ == "__main__":
 
     loaded = Page(test_pid,capacity=4048).load()
     loaded
+
 
