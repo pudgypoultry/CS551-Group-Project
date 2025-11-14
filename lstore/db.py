@@ -49,7 +49,7 @@ class Database():
     """
 
     def create_table(self, name, num_columns, key_index):
-        table = Table(name, num_columns, key_index)
+        table = Table(name, num_columns, key_index, self)
         self.tables[name] = table
         return table
 
@@ -73,7 +73,7 @@ class Database():
 
     def open_page(self, column, pageNumber):
         if (column, pageNumber) in self.bufferPool:
-            i = pages.index((column, pageNumber))
+            i = self.bufferPool.index((column, pageNumber))
             currentPage = self.bufferPool.pop(i)
             self.bufferPool.append(currentPage)
         else:
