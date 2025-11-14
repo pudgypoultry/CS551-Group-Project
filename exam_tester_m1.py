@@ -25,7 +25,7 @@ seed(3562901)
 for i in range(0, number_of_records):
     key = 92106429 + randint(0, number_of_records)
 
-    #skip duplicate keys
+    # skip duplicate keys
     while key in records:
         key = 92106429 + randint(0, number_of_records)
 
@@ -34,10 +34,9 @@ for i in range(0, number_of_records):
     # print('inserted', records[key])
 print("Insert finished")
 
-
 # Check inserted records using select query
 for key in records:
-    # select function will return array of records 
+    # select function will return array of records
     # here we are sure that there is only one record in t hat array
     # check for retreiving version -1. Should retreive version 0 since only one version exists.
     record = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)[0]
@@ -46,11 +45,10 @@ for key in records:
         if column != records[key][i]:
             error = True
     if error:
-        print('select error on', key, ':', record.columns, ', correct:', records[key])
+        print('select error on', key, ':', record, ', correct:', records[key])
     else:
         pass
         # print('select on', key, ':', record)
-print("initial select >>>")
 
 updated_records = {}
 for key in records:
@@ -64,44 +62,41 @@ for key in records:
         updated_records[key][i] = value
     query.update(key, *updated_columns)
 
-    #check version -1 for record
+    # check version -1 for record
     record = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)[0]
     error = False
     for j, column in enumerate(record.columns):
         if column != records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record.columns, ', correct:', records[key])
-        print("Error: version -1")
+        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
     else:
         pass
         # print('update on', original, 'and', updated_columns, ':', record)
-    #check version -2 for record
+
+    # check version -2 for record
     record = query.select_version(key, 0, [1, 1, 1, 1, 1], -2)[0]
     error = False
     for j, column in enumerate(record.columns):
         if column != records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record.columns, ', correct:', records[key])
-        print("Error: version -2")
+        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
     else:
         pass
         # print('update on', original, 'and', updated_columns, ':', record)
-    
-    #check version 0 for record
+
+    # check version 0 for record
     record = query.select_version(key, 0, [1, 1, 1, 1, 1], 0)[0]
     error = False
     for j, column in enumerate(record.columns):
         if column != updated_records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record.columns, ', correct:', updated_records[key])
-        print("Error: version 0")
+        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', updated_records[key])
 
-print("update passed>>>")
 keys = sorted(list(records.keys()))
-# aggregate on every column 
+# aggregate on every column
 for c in range(0, grades_table.num_columns):
     for i in range(0, number_of_aggregates):
         r = sorted(sample(range(0, len(keys)), 2))
@@ -125,7 +120,7 @@ for c in range(0, grades_table.num_columns):
         updated_column_sum = sum(map(lambda key: updated_records[key][c], keys[r[0]: r[1] + 1]))
         updated_result = query.sum_version(keys[r[0]], keys[r[1]], c, 0)
         if updated_column_sum != updated_result:
-            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', updated_result, ', correct: ', updated_column_sum)
+            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', updated_result, ', correct: ',
+                  updated_column_sum)
         else:
             pass
-print("aggragate test>>>")
