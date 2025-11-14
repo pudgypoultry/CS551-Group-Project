@@ -50,8 +50,14 @@ class Database():
     """
 
     def create_table(self, name, num_columns, key_index):
+        # create a table, create indices, make all pages, add them to the bufferpool memory objects
+
+        # table makes its own indices and pages upon creation
         table = Table(name, num_columns, key_index, self)
         self.tables[name] = table
+        for i in range(num_columns):
+            self.bufferPool.append((i,1))
+            # self.bufferPool.append() # Append the actual page? Or the tuple as specified?
         return table
 
     """
@@ -59,6 +65,13 @@ class Database():
     """
 
     def drop_table(self, name):
+        for pid in self.tables[name].pageDirectory.keys():
+            # access each page in pageDirectory
+            # FIXME: how to actually delete the page out of the text file?
+            del self.tables[name].pageDirectory[pid]
+        # delete all pages linked to table
+        # delete all page references in table
+        # delete table
         del self.tables[name]
 
     """
