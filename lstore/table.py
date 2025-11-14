@@ -224,6 +224,7 @@ class Table:
                     return Record(RID, data[self.primaryKey], data)
                 else:
                     data = [data[i] for i in range(len(columns)) if columns[i] == 1]
+                    return data
             elif (version != 0 and self.recordDirectory[RID] != -1):
                 # Lookup the version in record dir
                 tRID = self.recordDirectory[RID][version]
@@ -232,6 +233,7 @@ class Table:
                     return Record(tRID, data[self.primaryKey], data)
                 else:
                     data = [data[i] for i in range(len(columns)) if columns[i] == 1]
+                    return data
             else:
                 return False
         else:
