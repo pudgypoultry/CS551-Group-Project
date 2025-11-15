@@ -241,6 +241,13 @@ class Table:
 
     def save(self, db_path):
         """Write table metadata, record directory, and indexes to disk"""
+
+        # Merge records before saving to consolidate tail records
+        self.merge()
+
+        # Flush all dirty pages to disk
+        self.parentDatabase.page_buffer.flush_all()
+
         # Write metadata
         with open(f"{db_path}/{self.tableName}.meta", "w") as f:
             f.write(f"{self.tableName},{self.numColumns},{self.primaryKey}\n")
@@ -307,7 +314,93 @@ class Table:
 
     def merge(self):
         """
-        Description: Simple merge since we use cumulative updates.
+        Simple merge: Consolidate tail records back into new base records.
+        Merges records with tail records and updates indexes properly.
         """
-        pass
+        merged_count = 0
+        records_to_update = []
 
+        # Collect records that need merging
+        for base_rid, tail_list in self.recordDirectory.items():
+            if tail_list == -1:  # Skip deleted
+                continue
+            if len(tail_list) > 1:  # Has at least one tail record
+                records_to_update.append((base_rid, tail_list))
+
+        # Merge each record
+        for old_base_rid, tail_list in records_to_update:
+            # Get old base data (for index removal)
+            old_base_data = [
+                self.parentDatabase.page_buffer.request_page(loc[0]).read(loc[1])
+                for loc in old_base_rid
+            ]
+
+            # Get latest version data
+            latest_rid = tail_list[-1]
+            latest_data = [
+                self.parentDatabase.page_buffer.request_page(loc[0]).read(loc[1])
+                for loc in latest_rid
+            ]
+
+            # Create new base record with consolidated data
+            new_base_rid = []
+            for i, value in enumerate(latest_data):
+                # Ensure we have a page for this column
+                if i >= len(self.pageRange) or self.pageRange[i] is None:
+                    page_id = f"{self.tableName}-P-{i}-0"
+                    page = self.parentDatabase.page_buffer.new_page(page_id)
+                    self.pageDirectory[page_id] = page
+                    while len(self.pageRange) <= i:
+                        self.pageRange.append(None)
+                    self.pageRange[i] = page_id
+
+                page_id = self.pageRange[i]
+                page = self.parentDatabase.page_buffer.request_page(page_id)
+
+                # Create new page if full
+                if not page.hasCapacity():
+                    pNum = int(page_id.split('-')[-1]) + 1
+                    new_page_id = f"{self.tableName}-P-{i}-{pNum}"
+                    page = self.parentDatabase.page_buffer.new_page(new_page_id)
+                    self.pageDirectory[new_page_id] = page
+                    self.pageRange[i] = new_page_id
+                    page_id = new_page_id
+
+                # Write consolidated value
+                offset = page.write(value)
+                page.isdirty = True
+                new_base_rid.append((page_id, offset))
+
+            new_base_rid = tuple(new_base_rid)
+
+            # Update record directory - keep only new base
+            self.recordDirectory[new_base_rid] = [new_base_rid]
+            del self.recordDirectory[old_base_rid]
+
+            # Update indexes properly
+            for col_idx in range(self.numColumns):
+                tree = self.index.indices[col_idx]
+                old_value = old_base_data[col_idx]
+                new_value = latest_data[col_idx]
+
+                # Find and remove old RID from the index
+                leaf = tree.find(old_value)
+                if old_value in leaf.keys:
+                    rid_list = leaf[old_value]
+                    if isinstance(rid_list, list) and old_base_rid in rid_list:
+                        rid_list.remove(old_base_rid)
+                        # Update the leaf with modified list
+                        if len(rid_list) == 0:
+                            tree.delete(old_value)
+                        else:
+                            leaf[old_value] = rid_list
+
+                # Add new index entry
+                self.index.add_to_index(col_idx, new_value, new_base_rid)
+
+            merged_count += 1
+
+        if merged_count > 0:
+            print(f"[MERGE] Merged {merged_count} records")
+
+        return merged_count
