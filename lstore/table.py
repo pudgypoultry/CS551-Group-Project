@@ -172,9 +172,11 @@ class Table:
         self.recordDirectory[RID] = -1
 
     def update(self, primaryKey, *columns):
-        baseRID = self.index.locate(0, primaryKey)[0]
-        if len(baseRID) == 0:
+        locate_result = self.index.locate(0, primaryKey)
+        if len(locate_result) == 0:
             return False
+
+        baseRID = locate_result[0]
 
         # Get the last version
         RID = self.recordDirectory[baseRID][-1]
@@ -442,7 +444,7 @@ class Table:
         # recordDirectory *is* the deallocation. The physical page
         # space is not reclaimed, as this is an append-only design.
 
-        if merged_count > 0:
-            print(f"[MERGE] Merged {merged_count} records")
+        # if merged_count > 0:
+        #     print(f"[MERGE] Merged {merged_count} records")
 
         return merged_count

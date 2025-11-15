@@ -30,8 +30,13 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
-        # schema_encoding = '0' * self.table.num_columns
-        return self.table.insert(*columns)
+        primary_key_taken = self.table.index.locate(self.table.primaryKey, columns[self.table.primaryKey]) != []
+
+        if primary_key_taken:
+            return False
+        else:
+            success = self.table.insert(*columns)
+            return success
 
 
 
