@@ -275,7 +275,7 @@ class Leaf(Node):
             return True
         elif index != 0 and len(self.prev.keys) > minimum:
             borrowedKey = self.prev.keys.pop()
-            self.keys[0:0] = borrowedKey
+            self.keys[0:0] = [borrowedKey]
             self.values[borrowedKey] = self.prev.values[borrowedKey]
             self.parent.keys[index - 1] = self.keys[0]
             return True
