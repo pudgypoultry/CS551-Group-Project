@@ -28,7 +28,6 @@ class Database():
         Ultimately, we'll replace column/pagenumber (the first item of each entry in bufferpool) with the page itself
         """
 
-
         self.tables = {}
         self.bufferPool = []
         self.bufferPoolPIDs = []
@@ -54,7 +53,6 @@ class Database():
         table = Table(name, num_columns, key_index, self)
         self.tables[name] = table
         return table
-
 
     @property
     def pages_path(self):
@@ -117,7 +115,7 @@ class Database():
             table = Table.open(table_name, self.path, self)
             self.tables[table_name] = table
 
-        # Discover pages
+        # Discover pages and populate pageDirectory
         if os.path.exists(self.pages_path):
             for filename in os.listdir(self.pages_path):
                 if filename.endswith('.data'):
@@ -127,6 +125,37 @@ class Database():
                     if table_name in self.tables:
                         page = Page(page_id, path=self.pages_path)
                         self.tables[table_name].pageDirectory[page_id] = page
+
+        # FIX: Reconstruct pageRange for all tables
+        # The pageRange must point to the latest page (highest page number) for each column
+        for table in self.tables.values():
+            # Initialize pageRange with None
+            table.pageRange = [None] * table.numColumns
+
+            for page_id in table.pageDirectory:
+                # Parse Page ID: <TableName>-P-<Column>-<PageNum>
+                parts = page_id.split('-')
+                try:
+                    # Robust parsing from the right side
+                    if len(parts) < 4 or parts[-3] != 'P':
+                        continue
+
+                    pNum = int(parts[-1])
+                    col = int(parts[-2])
+
+                    if col >= table.numColumns:
+                        continue
+
+                    # Update pageRange if this page is newer (higher number)
+                    current_max = table.pageRange[col]
+                    if current_max is None:
+                        table.pageRange[col] = page_id
+                    else:
+                        current_max_num = int(current_max.split('-')[-1])
+                        if pNum > current_max_num:
+                            table.pageRange[col] = page_id
+                except (ValueError, IndexError):
+                    continue
 
     def drop_table(self, name):
         """Delete table"""
