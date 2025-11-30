@@ -5,6 +5,9 @@ from lstore.index import Index
 class Query:
     """
     # Creates a Query object that can perform different queries on the specified table 
+    Queries that fail must return False
+    Queries that succeed should return the result or True
+    Any query that crashes (due to exceptions) should return False
     """
 
     def __init__(self, table):
@@ -14,6 +17,8 @@ class Query:
     """
     # internal Method
     # Read a record with specified RID
+    # Returns True upon succesful deletion
+    # Return False if record doesn't exist or is locked due to 2PL
     """
 
     def delete(self, primary_key):
@@ -21,48 +26,105 @@ class Query:
 
     """
     # Insert a record with specified columns
+    # Return True upon succesful insertion
+    # Returns False if insert fails for whatever reason
     """
 
     def insert(self, *columns):
+        # schema_encoding = '0' * self.table.num_columns
         return self.table.insert(*columns)
 
     """
     # Read matching record with specified search key
+    # :param search_key: the value you want to search based on
+    # :param search_key_index: the column index you want to search based on
+    # :param projected_columns_index: what columns to return. array of 1 or 0 values.
+    # Returns a list of Record objects upon success
+    # Returns False if record locked by TPL
+    # Assume that select will never be called on a key that doesn't exist
     """
 
     def select(self, search_key, search_key_index, projected_columns_index):
-        # Default to Latest Version (0)
-        return self.select_version(search_key, search_key_index, projected_columns_index, 0)
+        isAllColumns = projected_columns_index == [1] * len(projected_columns_index)
+        records = []
+        RIDs = self.table.index.locate(search_key_index, search_key)
+        if isAllColumns:
+            # if all of the columns are wanted, it makes sense to fetch the whole Record object from table
+            for rid in RIDs:
+                # This if/else checks if the record has ever been updated
+                if len(self.table.recordDirectory[rid]) == 0:
+                    record = self.table.fetch(rid, version=0)
+                else:
+                    record = self.table.fetch(rid)
+
+                records.append(record)
+        else:
+            # if only some of the columns are wanted, return a list of dummy Record objects
+            for rid in RIDs:
+                # This if/else checks if the record has ever been updated
+                if len(self.table.recordDirectory[rid]) == 0:
+                    record_as_list = self.table.fetch(rid, version=0, columns=projected_columns_index)
+                else:
+                    record_as_list = self.table.fetch(rid, columns=projected_columns_index)
+
+                record = Record(None, None, record_as_list)
+
+                records.append(record)
+        return records
 
     """
     # Read matching record with specified search key
+    # :param search_key: the value you want to search based on
+    # :param search_key_index: the column index you want to search based on
+    # :param projected_columns_index: what columns to return. array of 1 or 0 values.
     # :param relative_version: the relative version of the record you need to retreive.
+    # Returns a list of Record objects upon success
+    # Returns False if record locked by TPL
+    # Assume that select will never be called on a key that doesn't exist
     """
 
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
+        isAllColumns = projected_columns_index == [1] * len(projected_columns_index)
         records = []
         RIDs = self.table.index.locate(search_key_index, search_key)
+        if isAllColumns:
+            # if all of the columns are wanted, it makes sense to fetch the whole Record object from table
+            for rid in RIDs:
+                # This if/else checks if relative_version is out of range => return base record
+                if len(self.table.recordDirectory[rid]) <= abs(relative_version):
+                    # Case 1: return the base record
+                    rVersion = 0
+                else:
+                    # Case 2: return a tail record
+                    rVersion = relative_version - 1
 
-        for rid in RIDs:
-            # Check if record is deleted
-            if rid in self.table.recordDirectory and self.table.recordDirectory[rid] == -1:
-                continue
+                record = self.table.fetch(rid, version=rVersion)
+                records.append(record)
+        else:
+            # if only some of the columns are wanted, return a list of dummy Record objects
+            for rid in RIDs:
+                # This if/else checks if relative_version is out of range => return base record
+                if len(self.table.recordDirectory[rid]) <= abs(relative_version):
+                    # Case 1: return the base record
+                    rVersion = 0
+                else:
+                    # Case 2: return a tail record
+                    rVersion = relative_version - 1
 
-            # Pass the relative version directly to fetch.
-            # Table.fetch handles bounds checking (clamping to Base if version is too old).
-            # We also pass projected columns to let fetch handle filtering.
-            record = self.table.fetch(rid, version=relative_version, columns=projected_columns_index)
-
-            if record:
+                record_as_list = self.table.fetch(rid, version=rVersion, columns=projected_columns_index)
+                record = Record(None, None, record_as_list)
                 records.append(record)
 
         return records
 
     """
     # Update a record with specified key and columns
+    # Returns True if update is succesful
+    # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
 
     def update(self, primary_key, *columns):
+        # same as insert, uses table.update
         status = self.table.update(primary_key, *columns)
         return status
 
@@ -70,37 +132,99 @@ class Query:
     :param start_range: int         # Start of the key range to aggregate 
     :param end_range: int           # End of the key range to aggregate 
     :param aggregate_columns: int  # Index of desired column to aggregate
+    # this function is only called on the primary key.
+    # Returns the summation of the given range upon success
+    # Returns False if no record exists in the given range
     """
 
     def sum(self, start_range, end_range, aggregate_column_index):
-        # Default to Latest Version (0)
-        return self.sum_version(start_range, end_range, aggregate_column_index, 0)
-
-    """
-    :param relative_version: the relative version of the record you need to retreive.
-    """
-
-    def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
-        sum_val = 0
+        # Set up
+        column_to_get = [0] * self.table.numColumns
+        column_to_get[aggregate_column_index] = 1
+        sum = 0
         record_exists = False
 
         for t in range(start_range, end_range + 1):
-            results = self.select_version(t, self.table.primaryKey, [1] * self.table.numColumns, relative_version)
-            if results:
-                sum_val += results[0].columns[aggregate_column_index]
+            # only accesses the needed column
+            try:
+                # select only the needed column using primary key
+                # self.select(t, self.table.primaryKey, column_to_get) returns a list containing one record object, which has one column
+                val_to_add = self.select(t, self.table.primaryKey, column_to_get)[0].columns[0]
+                # val_to_add = self.select(t, self.table.primaryKey, [1]*self.table.numColumns)[0].columns[aggregate_column_index]
+                sum += val_to_add
                 record_exists = True
+            except:
+                continue
 
         if record_exists:
-            return sum_val
+            return sum
         else:
+            # If there are no entries within the range return False
             return False
 
+    """
+    :param start_range: int         # Start of the key range to aggregate 
+    :param end_range: int           # End of the key range to aggregate 
+    :param aggregate_columns: int  # Index of desired column to aggregate
+    :param relative_version: the relative version of the record you need to retreive.
+    # this function is only called on the primary key.
+    # Returns the summation of the given range upon success
+    # Returns False if no record exists in the given range
+    """
+
+    def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
+        # Set up
+        column_to_get = [0] * self.table.numColumns
+        column_to_get[aggregate_column_index] = 1
+        sum = 0
+        record_exists = False
+
+        for t in range(start_range, end_range + 1):
+            # only accesses the needed column
+            try:
+                # select only the needed column using primary key
+                # self.select(t, self.table.primaryKey, column_to_get, relative_version) should return a list containing one record object
+                val_to_add = self.select_version(t, self.table.primaryKey, column_to_get, relative_version)[0].columns[
+                    0]
+                # val_to_add = self.select_version(t, self.table.primaryKey, [1]*self.table.numColumns, relative_version)[0].columns[aggregate_column_index]
+                sum += val_to_add
+                record_exists = True
+            except:
+                continue
+
+        if record_exists:
+            return sum
+        else:
+            # If there are no entries within the range return False
+            return False
+
+    """
+    incremenets one column of the record
+    this implementation should work if your select and update queries already work
+    :param key: the primary of key of the record to increment
+    :param column: the column to increment
+    # Returns True is increment is successful
+    # Returns False if no record matches key or if target record is locked by 2PL.
+    """
+
     def increment(self, key, column):
-        r = self.select(key, self.table.primaryKey, [1] * self.table.num_columns)
-        if r and len(r) > 0:
-            row = r[0]
-            updated_columns = [None] * self.table.numColumns
-            updated_columns[column] = row.columns[column] + 1
+        r = self.select(key, self.table.key, [1] * self.table.num_columns)[0]
+        if r is not False:
+            updated_columns = [None] * self.table.num_columns
+            updated_columns[column] = r[column] + 1
             u = self.update(key, *updated_columns)
             return u
         return False
+
+# Insert: 0.25, 0.25, 0.25
+# Update: 0.15625, 0.171875, 0.15625
+# Select: 3.78125, 3.8903625, 3.703125
+# Aggregate: 0.15625, 0.15625, 0.015625
+# Delete: 0.03125, 0.03125, 0.03125
+
+# After changing select and select_version:
+# Insert: 0.25, 0.234375, 0.25
+# Update: 0.171875, 0.15625, 0.203125
+# Select: 3.765625, 3.53125, 3.59375
+# Aggregate: 0.140625, 0.140625, 0.140625
+# Delete: 0.03125, 0.03125, 0.015625
