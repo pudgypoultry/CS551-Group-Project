@@ -81,15 +81,15 @@ def HandleShared(transactionNumber, existing, alreadyHolds):
 
 def HandleExclusive(existing, alreadyHolds):
     if alreadyHolds:
-        # Exclusive lock has already been assigned to current resource
+        # EXCLUSIVE lock has already been assigned to current resource
         if existing['type'] == "exclusive":
             return True
-        # Change shared lock to be exclusive since I'm the only one holding it
         elif len(existing['holders']) == 1:
+            # Change shared lock to be exclusive since I'm the only one holding it
             existing['type'] = "exclusive"
             return True
-        # Others are currently using this, can't make it exclusive
         else:
+            # Others are currently using this, can't make it exclusive
             return False
     else:
         # Exclusive lock isn't mine, don't touch it
