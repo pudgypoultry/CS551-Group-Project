@@ -119,102 +119,122 @@ class Table:
 
     def insert(self, *columns):
         # Lock to ensure atomic page allocation and index updates
-        with self.lock:
-            status = True
-            RID = []
+        status = True
+        RID = []
 
-            for i in range(self.numColumns):
-                # Check if we have a page for this column yet
-                if i >= len(self.pageRange) or self.pageRange[i] is None:
-                    # Create first page for this column
-                    page_id = f"{self.tableName}-P-{i}-0"
-                    page = self.parentDatabase.page_buffer.new_page(page_id)
-                    self.pageDirectory[page_id] = page
+        for i in range(self.numColumns):
+            while True:
+                # Critical Section: Metadata (Page Creation/Lookup)
+                with self.lock:
+                    # Check if we have a page for this column yet
+                    if i >= len(self.pageRange) or self.pageRange[i] is None:
+                        # Create first page for this column
+                        page_id = f"{self.tableName}-P-{i}-0"
+                        page = self.parentDatabase.page_buffer.new_page(page_id)
+                        self.pageDirectory[page_id] = page
 
-                    # Ensure pageRange is big enough
-                    while len(self.pageRange) <= i:
-                        self.pageRange.append(None)
-                    self.pageRange[i] = page_id
+                        # Ensure pageRange is big enough
+                        while len(self.pageRange) <= i:
+                            self.pageRange.append(None)
+                        self.pageRange[i] = page_id
 
-                page_id = self.pageRange[i]
+                    page_id = self.pageRange[i]
 
-                # Get page through buffer
-                page = self.parentDatabase.page_buffer.request_page(page_id)
+                    # Get page through buffer
+                    page = self.parentDatabase.page_buffer.request_page(page_id)
 
-                # Check if page is full
-                if not page.hasCapacity():
-                    # Extract page number and increment
-                    pNum = int(page_id.split('-')[-1]) + 1
+                    # Check if page is full
+                    if not page.hasCapacity():
+                        # Extract page number and increment
+                        pNum = int(page_id.split('-')[-1]) + 1
 
-                    # Create new PID with table prefix
-                    new_page_id = f"{self.tableName}-P-{i}-{pNum}"
+                        # Create new PID with table prefix
+                        new_page_id = f"{self.tableName}-P-{i}-{pNum}"
 
-                    # Create new page through buffer
-                    page = self.parentDatabase.page_buffer.new_page(new_page_id)
+                        # Create new page through buffer
+                        page = self.parentDatabase.page_buffer.new_page(new_page_id)
 
-                    # Register with table
-                    self.pageDirectory[new_page_id] = page
-                    self.pageRange[i] = new_page_id
+                        # Register with table
+                        self.pageDirectory[new_page_id] = page
+                        self.pageRange[i] = new_page_id
+                        page_id = new_page_id
 
-                # Write to page
-                offset = page.write(columns[i])
-                page.isdirty = True
-                RID.append((self.pageRange[i], offset))
+                # Write to page OUTSIDE table lock (Thread safe via Page lock)
+                try:
+                    offset = page.write(columns[i])
+                    page.isdirty = True
+                    RID.append((page_id, offset))
+                    break # Success, move to next column
+                except IndexError:
+                    # Race condition: Page became full between hasCapacity check and write
+                    # Retry the loop to trigger new page creation inside the lock
+                    continue
 
-            RID = tuple(RID)
-            self.recordDirectory[RID] = [RID]
+        RID = tuple(RID)
+        self.recordDirectory[RID] = [RID]
 
-            # Update index
-            for i in range(self.numColumns):
-                self.index.add_to_index(i, columns[i], RID)
+        # Update index
+        for i in range(self.numColumns):
+            self.index.add_to_index(i, columns[i], RID)
 
-            return status
+        return status
 
     def delete(self, primaryKey):
+        # Locate uses index (thread safe)
+        RID = self.index.locate(0, primaryKey)[0]
+        # Dict update is atomic enough for this, but to be safe with merge/save:
         with self.lock:
-            RID = self.index.locate(0, primaryKey)[0]
             self.recordDirectory[RID] = -1
 
     def update(self, primaryKey, *columns):
-        with self.lock:
-            baseRID = self.index.locate(0, primaryKey)[0]
-            if len(baseRID) == 0:
-                return False
+        # Locate uses index (thread safe)
+        baseRID = self.index.locate(0, primaryKey)[0]
+        if len(baseRID) == 0:
+            return False
 
-            # Get the last version
-            RID = self.recordDirectory[baseRID][-1]
-            tRID = []
+        # Transaction Manager holds exclusive lock on primaryKey,
+        # so reading recordDirectory for this key is safe from other transactions.
+        RID = self.recordDirectory[baseRID][-1]
+        tRID = []
 
-            # Create tail record
-            for i in range(self.numColumns):
-                page_id = self.pageRange[i]
+        # Create tail record
+        for i in range(self.numColumns):
+            while True:
+                # Critical Section: Metadata (Page Creation/Lookup)
+                with self.lock:
+                    page_id = self.pageRange[i]
 
-                # Get page through buffer
-                page = self.parentDatabase.page_buffer.request_page(page_id)
+                    # Get page through buffer
+                    page = self.parentDatabase.page_buffer.request_page(page_id)
 
-                # Check if page is full
-                if not page.hasCapacity():
-                    pNum = int(page_id.split('-')[-1]) + 1
-                    new_page_id = f"{self.tableName}-P-{i}-{pNum}"
+                    # Check if page is full
+                    if not page.hasCapacity():
+                        pNum = int(page_id.split('-')[-1]) + 1
+                        new_page_id = f"{self.tableName}-P-{i}-{pNum}"
 
-                    # Create new page through buffer
-                    page = self.parentDatabase.page_buffer.new_page(new_page_id)
+                        # Create new page through buffer
+                        page = self.parentDatabase.page_buffer.new_page(new_page_id)
 
-                    # Register with table
-                    self.pageDirectory[new_page_id] = page
-                    self.pageRange[i] = new_page_id
-                    page_id = new_page_id  # ← UPDATE page_id to use new page
+                        # Register with table
+                        self.pageDirectory[new_page_id] = page
+                        self.pageRange[i] = new_page_id
+                        page_id = new_page_id  # ← UPDATE page_id to use new page
 
-                # Write to page
-                if columns[i] is None:
-                    tRID.append(RID[i])
-                else:
-                    offset = page.write(columns[i])
-                    page.isdirty = True
-                    tRID.append((page_id, offset))  # ← Use page_id (not self.pageRange[i] in case it changed)
+                # Write to page OUTSIDE table lock
+                try:
+                    if columns[i] is None:
+                        tRID.append(RID[i])
+                    else:
+                        offset = page.write(columns[i])
+                        page.isdirty = True
+                        tRID.append((page_id, offset))
+                    break # Success
+                except IndexError:
+                    # Page full, retry to make new page
+                    continue
 
-            self.recordDirectory[baseRID].append(tuple(tRID))
-            return True
+        self.recordDirectory[baseRID].append(tuple(tRID))
+        return True
 
     def fetch(self, RID, version=-1, columns=[]):
         """
@@ -285,7 +305,7 @@ class Table:
         # Create table
         table = Table(name, num_columns, primary_key, parent_database)
 
-        # CLEAR default pages created by __init__
+        # Clear default pages created by __init__
         table.pageDirectory.clear()
         table.pageRange = []
 

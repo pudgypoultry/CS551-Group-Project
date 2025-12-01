@@ -1,6 +1,7 @@
 import time
 import os
 import logging
+from threading import Lock
 
 """
 Documentation for the page class.
@@ -10,6 +11,7 @@ Description:
     The page class contains all of the necessary operations for the page. See the method documentation
     for a detailed breakdown of all methods. 
 """
+
 
 class Page:
 
@@ -43,6 +45,7 @@ class Page:
         self.availableOffsets = []
         self.isdirty = True
         self.path = path
+        self.lock = Lock()
 
         if (type(pid) != type("str") or "P-" not in pid):
             err = "ERROR: Parameter <pid> must be a string in the format P-<int>."
@@ -59,7 +62,6 @@ class Page:
             err = "ERROR: Parameter <capacity> must be a non-zero integer."
             raise TypeError(err)
 
-
     def hasCapacity(self):
         """
         Description: This function checks if there is enough space to write to the page.
@@ -68,7 +70,8 @@ class Page:
         Ouputs:
             Boolean: <True> if there is enough space, else <False>
         """
-        return True if (len(self.availableOffsets) > 0) else False
+        with self.lock:
+            return True if (len(self.availableOffsets) > 0) else False
 
     def write(self, value):
         """
@@ -78,12 +81,13 @@ class Page:
         Outputs:
             index (int): The integer index that the data was stored at.
         """
-        index = self.availableOffsets.pop()
-        data = str(value).ljust(8, '=').encode('utf-8')
-        self.data[index: (index + 8)] = data
-        self.numRecords += 1
-        self.isdirty = True
-        return index
+        with self.lock:
+            index = self.availableOffsets.pop()
+            data = str(value).ljust(8, '=').encode('utf-8')
+            self.data[index: (index + 8)] = data
+            self.numRecords += 1
+            self.isdirty = True
+            return index
 
     def read(self, index):
         """
@@ -101,8 +105,9 @@ class Page:
         Inputs:
             index (int): the index of the value you wanna delete.
         """
-        self.availableOffsets.append(index)
-        self.numRecords -= 1
+        with self.lock:
+            self.availableOffsets.append(index)
+            self.numRecords -= 1
 
     def save(self):
         """
@@ -125,16 +130,16 @@ class Page:
         try:
 
             with open(f"{self.path}/{self.pageID}.data", "w") as outfile:
-                outfile.write(str(self.numRecords)+',')
-                outfile.write(str(self.capacity)+',')
-                outfile.write(str(self.entrySize)+',')
-                outfile.write(str(self.maxEntries)+',')
+                outfile.write(str(self.numRecords) + ',')
+                outfile.write(str(self.capacity) + ',')
+                outfile.write(str(self.entrySize) + ',')
+                outfile.write(str(self.maxEntries) + ',')
                 outfile.write('\n')
                 outfile.write(",".join(map(str, self.availableOffsets)))
 
             with open(f"{self.path}/{self.pageID}.bin", "wb") as outfile:
                 outfile.write(bytes(self.data))
-            
+
             self.isdirty = False
 
         except Exception as e:
@@ -177,9 +182,7 @@ if __name__ == "__main__":
     # Change to parent directory
     os.chdir('..')
     test_pid = ("P-blah")
-    Page(test_pid,capacity=4048).save()
+    Page(test_pid, capacity=4048).save()
 
-    loaded = Page(test_pid,capacity=4048).load()
+    loaded = Page(test_pid, capacity=4048).load()
     loaded
-
-

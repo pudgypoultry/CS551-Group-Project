@@ -87,33 +87,26 @@ class Query:
         isAllColumns = projected_columns_index == [1] * len(projected_columns_index)
         records = []
         RIDs = self.table.index.locate(search_key_index, search_key)
-        if isAllColumns:
-            # if all of the columns are wanted, it makes sense to fetch the whole Record object from table
-            for rid in RIDs:
-                # This if/else checks if relative_version is out of range => return base record
-                if len(self.table.recordDirectory[rid]) <= abs(relative_version):
-                    # Case 1: return the base record
-                    rVersion = 0
-                else:
-                    # Case 2: return a tail record
-                    rVersion = relative_version - 1
 
-                record = self.table.fetch(rid, version=rVersion)
-                records.append(record)
+        # Version 0 = latest, use RID with most versions
+        # Version -1, -2, etc. = historical, use RID with fewest versions (base)
+        if relative_version == 0:
+            rid = max(RIDs, key=lambda r: len(self.table.recordDirectory[r]))
         else:
-            # if only some of the columns are wanted, return a list of dummy Record objects
-            for rid in RIDs:
-                # This if/else checks if relative_version is out of range => return base record
-                if len(self.table.recordDirectory[rid]) <= abs(relative_version):
-                    # Case 1: return the base record
-                    rVersion = 0
-                else:
-                    # Case 2: return a tail record
-                    rVersion = relative_version - 1
+            rid = min(RIDs, key=lambda r: len(self.table.recordDirectory[r]))
 
-                record_as_list = self.table.fetch(rid, version=rVersion, columns=projected_columns_index)
-                record = Record(None, None, record_as_list)
-                records.append(record)
+        if len(self.table.recordDirectory[rid]) <= abs(relative_version):
+            rVersion = 0
+        else:
+            rVersion = relative_version - 1
+
+        if isAllColumns:
+            record = self.table.fetch(rid, version=rVersion)
+            records.append(record)
+        else:
+            record_as_list = self.table.fetch(rid, version=rVersion, columns=projected_columns_index)
+            record = Record(None, None, record_as_list)
+            records.append(record)
 
         return records
 
